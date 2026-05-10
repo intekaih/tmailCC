@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+
+# Production
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.example
+.env.development.local
+.env.test.local
+.env.production.local
+server/.env
+client/.env.local
+
+# Database credentials
+*.sql.backup
+*.dump
+*.pgdump
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-settings
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Archives
+*.tar.gz
+*.zip
+
+# PM2
+.pm2/
+.pm2的历史/
+
+# Termux
+~/
+.termux/
+
+# Cloudflare
+.tunnel-history
+.tunnel.config
+
+# Misc
+*.bak
+*.tmp
+*.temp

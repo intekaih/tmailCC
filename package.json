@@ -1,0 +1,11 @@
+{
+  "name": "tmailCC-web-system",
+  "version": "1.0.0",
+  "description": "Hệ thống Webmail trên Termux + Cloudflare Tunnel",
+  "scripts": {
+    "install": "cd client && npm install",
+    "dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd client && npm start"
+  }
+}
