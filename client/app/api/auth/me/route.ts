@@ -1,0 +1,69 @@
+/**
+ * GET /api/auth/me - Get current user
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+function getJwtSecret() {
+  const secret = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('SUPABASE_JWT_SECRET or JWT_SECRET is required in production');
+  }
+  return secret || 'tmail-dev-secret-change-in-production';
+}
+
+const JWT_SECRET = getJwtSecret();
+
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'No token provided' }, { status: 401 });
+    }
+
+    const token = authHeader.slice(7);
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    } catch {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
+    const { data: profile, error } = await supabaseAdmin
+      .from('profiles')
+      .select('username, role, email_count, preferences, is_active, avatar_url')
+      .eq('id', decoded.sub)
+      .maybeSingle();
+
+    if (error || !profile) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (!profile.is_active) {
+      return NextResponse.json({ error: 'Account is disabled' }, { status: 403 });
+    }
+
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(decoded.sub as string);
+
+    return NextResponse.json({
+      user: {
+        id: decoded.sub,
+        username: profile.username,
+        email: decoded.email || authUser?.user?.email || '',
+        role: profile.role,
+        avatarUrl: profile.avatar_url || null,
+        emailCount: profile.email_count,
+        preferences: profile.preferences,
+      },
+    });
+  } catch (err) {
+    console.error('[Auth] /me error:', err);
+    return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+  }
+}
