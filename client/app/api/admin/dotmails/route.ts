@@ -103,25 +103,32 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
     const lock = await client.getMailboxLock('INBOX');
 
     try {
-      const sinceDate = new Date(Date.now() - 30 * 60 * 1000); // last 30 minutes
-      const messages = client.fetch(
-        { since: sinceDate },
-        { source: true, uid: true, envelope: true }
-      );
+      const status = await client.status('INBOX', { messages: true });
+      const totalMessages = status.messages || 0;
+
+      let messages;
+      if (totalMessages > 0) {
+        const startSeq = Math.max(1, totalMessages - 20 + 1);
+        messages = client.fetch(
+          `${startSeq}:${totalMessages}`,
+          { source: true, uid: true, envelope: true }
+        );
+      } else {
+        messages = [];
+      }
 
       const emails: any[] = [];
       for await (const msg of messages) {
         try {
           const parsed = await simpleParser(msg.source);
           const emailDate = parsed.date || new Date();
-          if (emailDate < sinceDate) continue;
 
           // Check that the email was actually sent to the specific dotmail
           const toHeader = (parsed.to?.text || '').toLowerCase();
           const ccHeader = (parsed.cc?.text || '').toLowerCase();
-          const dotmailLower = dotmailAddress.toLowerCase();
+          const dotmailUsername = dotmailAddress.toLowerCase().split('@')[0];
           
-          const isTargetDotmail = toHeader.includes(dotmailLower) || ccHeader.includes(dotmailLower);
+          const isTargetDotmail = toHeader.includes(dotmailUsername) || ccHeader.includes(dotmailUsername);
           if (!isTargetDotmail) continue;
 
           const textContent = parsed.text || '';
