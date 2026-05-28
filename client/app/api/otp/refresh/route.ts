@@ -134,6 +134,107 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if it is a Gmail Dotmail account
+    const { data: dotmail } = await supabaseAdmin!
+      .from('gmail_dotmails')
+      .select('parent_id, address')
+      .eq('address', addressLower)
+      .maybeSingle();
+
+    if (dotmail) {
+      const { data: parent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('address, app_password')
+        .eq('id', dotmail.parent_id)
+        .maybeSingle();
+
+      if (parent) {
+        // Scan via IMAP
+        const { ImapFlow } = require('imapflow');
+        const { simpleParser } = require('mailparser');
+
+        const client = new ImapFlow({
+          host: 'imap.gmail.com',
+          port: 993,
+          secure: true,
+          auth: { user: parent.address, pass: parent.app_password },
+          logger: false,
+        });
+
+        await client.connect();
+        const lock = await client.getMailboxLock('INBOX');
+        try {
+          const status = await client.status('INBOX', { messages: true });
+          const totalMessages = status.messages || 0;
+          let messages = [];
+          if (totalMessages > 0) {
+            const startSeq = Math.max(1, totalMessages - 20 + 1);
+            messages = client.fetch(
+              `${startSeq}:${totalMessages}`,
+              { source: true, uid: true, envelope: true }
+            );
+          }
+
+          const emailsList: any[] = [];
+          for await (const msg of messages) {
+            try {
+              const parsed = await simpleParser(msg.source);
+              const emailDate = parsed.date || new Date();
+
+              const rawSource = msg.source.toString('utf-8');
+              const headerEnd = rawSource.indexOf('\r\n\r\n');
+              const headersText = headerEnd !== -1 ? rawSource.substring(0, headerEnd).toLowerCase() : rawSource.toLowerCase();
+
+              const toHeaderMatch = headersText.match(/^to:\s*([\s\S]*?)(?=\r?\n[^\s]|$)/m);
+              const ccHeaderMatch = headersText.match(/^cc:\s*([\s\S]*?)(?=\r?\n[^\s]|$)/m);
+              const toText = toHeaderMatch ? toHeaderMatch[1] : '';
+              const ccText = ccHeaderMatch ? ccHeaderMatch[1] : '';
+
+              const extractEmails = (text: string): string[] => {
+                const regex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+                const matches = text.match(regex);
+                return matches ? matches.map(m => m.toLowerCase().trim()) : [];
+              };
+
+              const targetEmail = addressLower;
+              const recipientEmails = [...extractEmails(toText), ...extractEmails(ccText)];
+              const isTargetDotmail = recipientEmails.includes(targetEmail);
+
+              if (!isTargetDotmail) continue;
+
+              const textContent = parsed.text || '';
+              const htmlContent = parsed.html || '';
+              const strippedHtml = htmlContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+              const combinedText = `${parsed.subject || ''}\n${textContent}\n${strippedHtml}`;
+              const otp = extractOTP(combinedText);
+
+              emailsList.push({
+                code: otp,
+                from: parsed.from?.text || '',
+                subject: parsed.subject || '',
+                receivedAt: emailDate.toISOString(),
+                date: emailDate
+              });
+            } catch {}
+          }
+
+          emailsList.sort((a, b) => b.date.getTime() - a.date.getTime());
+          if (emailsList.length > 0) {
+            return NextResponse.json({
+              code: emailsList[0].code,
+              from: emailsList[0].from,
+              subject: emailsList[0].subject,
+              receivedAt: emailsList[0].receivedAt,
+            });
+          }
+          return NextResponse.json({ code: null });
+        } finally {
+          lock.release();
+          await client.logout().catch(() => {});
+        }
+      }
+    }
+
     // Find account
     const { data: account } = await supabaseAdmin!.from('accounts').select('id').eq('address', addressLower).maybeSingle();
 
