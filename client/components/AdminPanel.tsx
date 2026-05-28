@@ -66,6 +66,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
   const [checkingParentId, setCheckingParentId] = useState<string | null>(null);
   const [editingParentId, setEditingParentId] = useState<string | null>(null);
   const [editingAppPassword, setEditingAppPassword] = useState<string>('');
+  const [showGmailHelp, setShowGmailHelp] = useState(false);
   const [selectedCfDomains, setSelectedCfDomains] = useState<string[]>([]);
 
   async function runConfirmAction() {
@@ -1098,6 +1099,18 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                     Thêm Gmail
                   </button>
+                  <button 
+                    className="btn btn-ghost btn-sm" 
+                    style={{ padding: '0 8px', height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                    onClick={() => setShowGmailHelp(true)}
+                    title="Hướng dẫn cấu hình Gmail"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                  </button>
                 </div>
 
                 {dotmailParents.length === 0 && (
@@ -1752,6 +1765,84 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             margin-top: 12px;
           }
         `}</style>
+
+        {showGmailHelp && (
+          <div 
+            className="modal-overlay" 
+            style={{ zIndex: 1010 }}
+            onClick={() => setShowGmailHelp(false)}
+          >
+            <div 
+              className="card" 
+              style={{ 
+                width: '100%', 
+                maxWidth: 450, 
+                padding: 24, 
+                background: 'var(--bg-primary)', 
+                borderRadius: 12, 
+                border: '1px solid var(--border)',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                position: 'relative'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Hướng dẫn cấu hình Gmail</h3>
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  style={{ padding: 4 }} 
+                  onClick={() => setShowGmailHelp(false)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div style={{ fontSize: 13.5, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p>Để hệ thống tmailCC có thể kết nối và tự động lấy mã OTP từ tài khoản Gmail gốc của bạn, vui lòng cấu hình theo các bước sau:</p>
+                
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>1</span>
+                  <div>
+                    <strong>Bật xác minh 2 lớp (2-Step Verification)</strong>
+                    <br />
+                    Truy cập vào trang cấu hình bảo mật tài khoản Google của bạn và kích hoạt xác minh 2 lớp:
+                    <br />
+                    👉 <a href="https://myaccount.google.com/signinoption/two-step-verification" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Kích hoạt xác minh 2 lớp</a>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>2</span>
+                  <div>
+                    <strong>Tạo Mật khẩu ứng dụng (App Password)</strong>
+                    <br />
+                    Sau khi đã bật xác minh 2 lớp, truy cập liên kết dưới đây để tạo Mật khẩu ứng dụng mới cho Mail/IMAP:
+                    <br />
+                    👉 <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Tạo Mật khẩu ứng dụng Google</a>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>3</span>
+                  <div>
+                    <strong>Nhập thông tin và Thêm Gmail</strong>
+                    <br />
+                    Nhập địa chỉ Gmail gốc (ví dụ: <code>00yt0001@gmail.com</code>) và mật khẩu ứng dụng vừa tạo (16 ký tự viết liền, không dấu cách) vào ô nhập liệu bên ngoài rồi nhấn <strong>Thêm Gmail</strong>.
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowGmailHelp(false)}>
+                  Đã hiểu
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
