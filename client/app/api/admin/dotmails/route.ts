@@ -103,9 +103,9 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
     const lock = await client.getMailboxLock('INBOX');
 
     try {
-      const sinceDate = new Date(Date.now() - 10 * 60 * 1000); // last 10 minutes
+      const sinceDate = new Date(Date.now() - 30 * 60 * 1000); // last 30 minutes
       const messages = client.fetch(
-        { since: sinceDate, seen: false },
+        { since: sinceDate },
         { source: true, uid: true, envelope: true }
       );
 
@@ -115,6 +115,20 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
           const parsed = await simpleParser(msg.source);
           const emailDate = parsed.date || new Date();
           if (emailDate < sinceDate) continue;
+
+          // Check that the email was actually sent to the specific dotmail
+          const toHeader = (parsed.to?.text || '').toLowerCase();
+          const deliveredTo = (parsed.headers?.get('delivered-to') || '').toString().toLowerCase();
+          const headersStr = JSON.stringify(parsed.headers || {}).toLowerCase();
+          const dotmailLower = dotmailAddress.toLowerCase();
+          
+          const isTargetDotmail = 
+            toHeader.includes(dotmailLower) || 
+            deliveredTo.includes(dotmailLower) ||
+            headersStr.includes(dotmailLower) ||
+            dotmailLower === parentEmail.toLowerCase();
+            
+          if (!isTargetDotmail) continue;
 
           const textContent = parsed.text || '';
           const htmlContent = parsed.html || '';
