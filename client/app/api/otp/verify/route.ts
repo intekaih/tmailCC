@@ -87,18 +87,31 @@ function extractOTP(text: string | null): string | null {
   return null;
 }
 
+function cleanCredential(text: string): string {
+  const regex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\|([a-fA-F0-9]{32})(?:\|([a-zA-Z0-9]{16,64}))?/i;
+  const match = text.match(regex);
+  if (match) {
+    const email = match[1];
+    const key = match[2];
+    const twofa = match[3];
+    return twofa ? `${email}|${key}|${twofa}` : `${email}|${key}`;
+  }
+  return text.trim();
+}
+
 /**
  * POST /api/otp/verify
  */
 export async function POST(request: NextRequest) {
   try {
     const { credential } = await request.json();
+    const cleaned = credential ? cleanCredential(credential) : '';
 
-    if (!credential || !credential.includes('|')) {
+    if (!cleaned || !cleaned.includes('|')) {
       return NextResponse.json({ error: 'Định dạng: email|key hoặc email|key|2fa_secret' }, { status: 400 });
     }
 
-    const parts = credential.split('|');
+    const parts = cleaned.split('|');
     const addressLower = (parts[0] || '').trim().toLowerCase();
     const accessKey = (parts[1] || '').trim();
 

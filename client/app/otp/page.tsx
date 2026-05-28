@@ -67,12 +67,24 @@ export default function OTPPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = credential.trim();
+    let trimmed = credential.trim();
+    
+    // Extract clean email|key credential from text
+    const cleanRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\|([a-fA-F0-9]{32})(?:\|([a-zA-Z0-9]{16,64}))?/i;
+    const match = trimmed.match(cleanRegex);
+    if (match) {
+      const email = match[1];
+      const key = match[2];
+      const twofa = match[3];
+      trimmed = twofa ? `${email}|${key}|${twofa}` : `${email}|${key}`;
+      setCredential(trimmed);
+    }
+
     if (!trimmed || !trimmed.includes('|')) {
       setError('Nhập đúng định dạng: email|key hoặc email|key|2fa_secret');
       return;
     }
-
+    
     setLoading(true);
     setError('');
     credentialRef.current = trimmed;
