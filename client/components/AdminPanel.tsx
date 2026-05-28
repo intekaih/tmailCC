@@ -223,6 +223,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
       toast(err.message || 'Lỗi khi đồng bộ Cloudflare', 'error');
     } finally {
       setSyncLoading(false);
+    }
   }
 
   async function handleCheckConfigureDomain(domainName: string) {
