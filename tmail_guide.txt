@@ -1,0 +1,43 @@
+========== TÀI LIỆU QUẢN TRỊ SERVER WEBMAIL BẰNG PHONEFARM (TOTAL CONTROL) ==========
+
+--- TÌNH HUỐNG 1: KHI CÓ THÊM 1 MÁY ĐIỆN THOẠI MỚI TINH ---
+# Bước 1: Mở Powershell (Run as Admin) trên PC, chạy lệnh sau để bật Server truyền file qua cáp USB:
+   .\tmail_deploy.ps1
+
+# Bước 2: Token Cloudflare Tunnel đã tích hợp sẵn trong `ecosystem.config.js`. Nếu cần đổi token, sửa trường `args` của process `cloudflare_tunnel` trong file đó.
+
+# Bước 3: Ở trên ứng dụng Total Control, mở điện thoại mới, dán cụm lệnh này vào Termux để nó tự hút code, cài đặt và chạy tự động:
+   curl -s http://127.0.0.1:8088/tmail_payload.sh | bash
+
+
+
+--- TÌNH HUỐNG 2: CẬP NHẬT CODE GIAO DIỆN / TÍNH NĂNG MỚI (TỪ PC LÊN CÁC PHONE) ---
+# Bước 1: Sau khi code xong ở máy tính, chạy lệnh PowerShell để nén (Build) code:
+   .\tmail_deploy.ps1
+# (Script sẽ tự động build Next.js Frontend và nén gọn lại thành tmail.tar.gz)
+
+# Bước 2: Trên màn hình đa khung của Total Control, quét bôi đen cả đàn máy, gõ cụm lệnh sau để chúng tự động lấy code mới về:
+   curl -s http://127.0.0.1:8088/tmail_update.sh | bash
+
+
+
+--- TÌNH HUỐNG 3: MẤT ĐIỆN, HOẶC KHỞI ĐỘNG LẠI TẤT CẢ ĐIỆN THOẠI ---
+# Sau khi cắm điện lại, mở app Termux lên.
+# Bôi đen chọn toàn bộ điện thoại trên Total Control, gõ 1 lệnh duy nhất là hệ thống sống lại:
+   pm2 resurrect
+
+
+
+--- CẤU TRÚC PM2 ---
+Sử dụng `pm2 list` để xem tình trạng. Các tiến trình đang chạy ngầm gồm:
+1. "tmail-app"          - Ứng dụng Next.js (bao gồm Giao diện và API routes) (Cổng 3000).
+2. "cloudflare_tunnel" - Chạy kết nối Internet không cần NAT Port.
+
+Dùng `pm2 logs` để xem lỗi hoặc email có vào hay không.
+
+
+
+--- LƯU Ý KHI GẮN WORKER ---
+Mỗi khi setup xong, điện thoại đã nối lên Cloudflare bằng Tunnel.
+Tại mục Email Routing của Cloudflare, bạn bắt một Catch-All Rule trỏ tới 1 con Worker duy nhất (tmail-worker.js).
+Worker đó sẽ đẩy email ngược lại Next.js App ở điện thoại. Nhớ cấu hình biến `WEBHOOK_URL` trong Worker khớp với tên miền Tunnel của điện thoại.

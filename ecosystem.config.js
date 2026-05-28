@@ -1,0 +1,35 @@
+module.exports = {
+  apps: [
+    {
+      name: 'tmail-app',
+      script: 'node_modules/next/dist/bin/next',
+      args: 'start -p 3000',
+      cwd: './client',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000,
+      },
+      error_file: './logs/app-error.log',
+      out_file: './logs/app-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      merge_logs: true,
+    },
+    {
+      name: 'cloudflare_tunnel',
+      script: 'cloudflared',
+      args: 'tunnel run --token eyJhIjoiNGE2NTdhMzdlY2IwNWVmMGJlMTYyNjBmNWY2NDYxMjUiLCJ0IjoiNjI4ZTFkOTctMGQ5MS00MmU5LThiZWMtZDNiOThkNTM3ZjdlIiwicyI6Ik9XRXdOMlV6WVRjdE5tRXlPQzAwWWpkaExXRmhNREV0WTJGallqYzNOekptWm1RMSJ9',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '150M',
+      error_file: './logs/tunnel-error.log',
+      out_file: './logs/tunnel-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      merge_logs: true,
+    },
+  ],
+};
