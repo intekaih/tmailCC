@@ -133,15 +133,22 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
           
           const toText = toHeaderMatch ? toHeaderMatch[1] : '';
           const ccText = ccHeaderMatch ? ccHeaderMatch[1] : '';
-          const dotmailUsername = dotmailAddress.toLowerCase().split('@')[0];
-          
-          const isTargetDotmail = toText.includes(dotmailUsername) || ccText.includes(dotmailUsername);
+          const extractEmails = (text: string): string[] => {
+            const regex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+            const matches = text.match(regex);
+            return matches ? matches.map(m => m.toLowerCase().trim()) : [];
+          };
+
+          const targetEmail = dotmailAddress.toLowerCase().trim();
+          const recipientEmails = [...extractEmails(toText), ...extractEmails(ccText)];
+          const isTargetDotmail = recipientEmails.includes(targetEmail);
           
           console.log('[Dotmail OTP] Checking email:', {
             subject: parsed.subject,
             toHeader: toText.trim(),
             ccHeader: ccText.trim(),
-            dotmailUsername,
+            targetEmail,
+            recipientEmails,
             isTargetDotmail
           });
 
