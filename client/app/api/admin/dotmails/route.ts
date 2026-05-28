@@ -339,6 +339,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
       }
 
+      const { ImapFlow } = require('imapflow');
+
       const client = new ImapFlow({
         host: 'imap.gmail.com',
         port: 993,
