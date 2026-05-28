@@ -90,14 +90,33 @@ export async function POST(request: NextRequest) {
     const storagePath = `${userId}/avatar.${ext}`;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    // Delete old avatar files (any extension) before uploading new one
-    const { data: existingFiles } = await supabaseAdmin!.storage
-      .from('avatars')
-      .list(userId);
+    // Auto-create bucket if missing
+    try {
+      const { data: buckets } = await supabaseAdmin!.storage.listBuckets();
+      const hasAvatars = buckets?.some(b => b.id === 'avatars');
+      if (!hasAvatars) {
+        await supabaseAdmin!.storage.createBucket('avatars', {
+          public: true,
+          fileSizeLimit: 2097152,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+        });
+      }
+    } catch (e) {
+      console.warn('[Avatar] Check/Create bucket warning:', e);
+    }
 
-    if (existingFiles && existingFiles.length > 0) {
-      const filesToDelete = existingFiles.map((f) => `${userId}/${f.name}`);
-      await supabaseAdmin!.storage.from('avatars').remove(filesToDelete);
+    // Delete old avatar files (any extension) before uploading new one
+    try {
+      const { data: existingFiles } = await supabaseAdmin!.storage
+        .from('avatars')
+        .list(userId);
+
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToDelete = existingFiles.map((f) => `${userId}/${f.name}`);
+        await supabaseAdmin!.storage.from('avatars').remove(filesToDelete);
+      }
+    } catch (e) {
+      console.warn('[Avatar] Delete old files warning:', e);
     }
 
     // Upload new avatar to Supabase Storage
@@ -112,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (uploadError) {
       console.error('[Avatar] Upload error:', uploadError);
       return NextResponse.json(
-        { error: 'Failed to upload avatar' },
+        { error: 'Failed to upload avatar to storage. Check bucket permissions.' },
         { status: 500 }
       );
     }
@@ -132,6 +151,12 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('[Avatar] Profile update error:', updateError);
+      if (updateError.code === '42703') {
+        return NextResponse.json(
+          { error: 'Cột avatar_url chưa được tạo trong bảng profiles. Vui lòng chạy file SQL: supabase/avatar_migration.sql trong Supabase Dashboard > SQL Editor.' },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
         { error: 'Failed to update profile' },
         { status: 500 }
