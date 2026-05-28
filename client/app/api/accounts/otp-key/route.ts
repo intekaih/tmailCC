@@ -67,18 +67,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ownership
-    const { data: account } = await supabaseAdmin!
-      .from('accounts')
-      .select('id, user_id')
+    let isOwner = false;
+
+    // Check if it is a dotmail
+    const { data: dotmail } = await supabaseAdmin!
+      .from('gmail_dotmails')
+      .select('id')
       .eq('address', address)
       .maybeSingle();
 
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    if (dotmail) {
+      // Only admins can generate OTP keys for dotmails
+      if (user.role === 'admin') {
+        isOwner = true;
+      }
+    } else {
+      // Check normal account ownership
+      const { data: account } = await supabaseAdmin!
+        .from('accounts')
+        .select('id, user_id')
+        .eq('address', address)
+        .maybeSingle();
+
+      if (account) {
+        if (user.role === 'admin' || account.user_id === user.id) {
+          isOwner = true;
+        }
+      }
     }
 
-    if (user.role !== 'admin' && account.user_id !== user.id) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    if (!isOwner) {
+      return NextResponse.json({ error: 'Quyền truy cập bị từ chối hoặc tài khoản không tồn tại' }, { status: 403 });
     }
 
     const accessKey = crypto.randomBytes(16).toString('hex');
