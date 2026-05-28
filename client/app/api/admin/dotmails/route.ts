@@ -118,16 +118,10 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
 
           // Check that the email was actually sent to the specific dotmail
           const toHeader = (parsed.to?.text || '').toLowerCase();
-          const deliveredTo = (parsed.headers?.get('delivered-to') || '').toString().toLowerCase();
-          const headersStr = JSON.stringify(parsed.headers || {}).toLowerCase();
+          const ccHeader = (parsed.cc?.text || '').toLowerCase();
           const dotmailLower = dotmailAddress.toLowerCase();
           
-          const isTargetDotmail = 
-            toHeader.includes(dotmailLower) || 
-            deliveredTo.includes(dotmailLower) ||
-            headersStr.includes(dotmailLower) ||
-            dotmailLower === parentEmail.toLowerCase();
-            
+          const isTargetDotmail = toHeader.includes(dotmailLower) || ccHeader.includes(dotmailLower);
           if (!isTargetDotmail) continue;
 
           const textContent = parsed.text || '';
