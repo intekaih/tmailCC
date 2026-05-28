@@ -578,7 +578,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     setSelectedEmail(email);
     if (!email.isRead) {
       try {
-        await api.emails.markRead(email._id, true);
+        await api.emails.markRead(email._id, true, email.to);
         setEmails(prev => prev.map(e => e._id === email._id ? { ...e, isRead: true } : e));
         setUnreadCount(prev => Math.max(0, prev - 1));
         if (selectedAccount) {
@@ -595,7 +595,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
   async function handleToggleStar(email: Email) {
     try {
-      const updated = await api.emails.markStar(email._id, !email.isStarred);
+      const updated = await api.emails.markStar(email._id, !email.isStarred, email.to);
       setEmails(prev => prev.map(e => e._id === email._id ? updated : e));
       if (selectedEmail?._id === email._id) setSelectedEmail(updated);
     } catch (err: any) { showToast(err.message, 'error'); }
@@ -603,7 +603,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
   async function handleDeleteEmail(email: Email) {
     try {
-      await api.emails.remove(email._id);
+      await api.emails.remove(email._id, email.to);
       setEmails(prev => prev.filter(e => e._id !== email._id));
       if (selectedEmail?._id === email._id) setSelectedEmail(null);
       const wasUnread = !email.isRead;

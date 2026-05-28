@@ -71,9 +71,18 @@ async function apiCreateAccount(address: string): Promise<{ account: any; guestT
 
 async function apiGetAccount(address: string): Promise<any> {
   const token = localStorage.getItem('tmail_token');
+  let guestToken = null;
+  try {
+    const tokens = JSON.parse(localStorage.getItem('tmail_guest_tokens') || '{}');
+    guestToken = tokens[address.toLowerCase()] || null;
+  } catch (err) {
+    // ignore
+  }
+
   const res = await fetch(`/api/accounts/${encodeURIComponent(address)}`, {
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(guestToken ? { 'X-Guest-Token': guestToken } : {}),
     },
   });
   const data = await res.json();

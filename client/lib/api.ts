@@ -248,7 +248,11 @@ export const api = {
     },
 
     get: (address: string) =>
-      request<Account>(`/api/accounts/${encodeURIComponent(address)}`),
+      request<Account>(`/api/accounts/${encodeURIComponent(address)}`, {
+        headers: {
+          ...(getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
+      }),
 
     remove: (address: string) =>
       request<{ message: string }>(`/api/accounts/${encodeURIComponent(address)}`, {
@@ -278,31 +282,52 @@ export const api = {
       if (params?.limit) qs.set('limit', String(params.limit));
       if (params?.skip) qs.set('skip', String(params.skip));
       if (params?.unreadOnly) qs.set('unreadOnly', 'true');
-      return request<EmailsResponse>(`/api/emails?${qs.toString()}`);
+      return request<EmailsResponse>(`/api/emails?${qs.toString()}`, {
+        headers: {
+          ...(getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
+      });
     },
 
-    get: (id: string) => request<Email>(`/api/emails/${id}`),
+    get: (id: string, address?: string) =>
+      request<Email>(`/api/emails/${id}`, {
+        headers: {
+          ...(address && getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
+      }),
 
-    markRead: (id: string, isRead: boolean) =>
+    markRead: (id: string, isRead: boolean, address?: string) =>
       request<Email>(`/api/emails/${id}/read`, {
         method: 'PATCH',
         body: JSON.stringify({ isRead }),
+        headers: {
+          ...(address && getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
       }),
 
-    markStar: (id: string, isStarred: boolean) =>
+    markStar: (id: string, isStarred: boolean, address?: string) =>
       request<Email>(`/api/emails/${id}/star`, {
         method: 'PATCH',
         body: JSON.stringify({ isStarred }),
+        headers: {
+          ...(address && getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
       }),
 
-    remove: (id: string) =>
+    remove: (id: string, address?: string) =>
       request<{ message: string }>(`/api/emails/${id}`, {
         method: 'DELETE',
+        headers: {
+          ...(address && getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
       }),
 
     clearAll: (address: string) =>
       request<{ message: string; deleted: number }>(`/api/emails?address=${encodeURIComponent(address)}`, {
         method: 'DELETE',
+        headers: {
+          ...(getGuestToken(address) ? { 'X-Guest-Token': getGuestToken(address)! } : {}),
+        },
       }),
   },
 
