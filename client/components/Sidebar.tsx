@@ -239,11 +239,15 @@ export default function Sidebar({
     return () => { cancelled = true; };
   }, [showCreate, accounts.length, domainVersion, user]);
 
-  const accountDomains = Array.from(new Set(accounts.map(a => a.domain)));
-
   useEffect(() => {
-    setExpandedDomains(new Set(accountDomains));
-  }, [accounts]);
+    if (selectedAccount?.domain) {
+      setExpandedDomains(prev => {
+        const next = new Set(prev);
+        next.add(selectedAccount.domain);
+        return next;
+      });
+    }
+  }, [selectedAccount]);
 
   async function handleCreate() {
     const local = customLocal.trim() || generateRandom(12);
