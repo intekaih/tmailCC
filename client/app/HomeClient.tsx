@@ -421,6 +421,20 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
   useEffect(() => { localStorage.setItem('tmail_locale', locale); }, [locale]);
 
+  // Keep selectedEmail in sync with the current emails list and selectedAccount
+  useEffect(() => {
+    if (!selectedAccount) {
+      setSelectedEmail(null);
+      return;
+    }
+    if (selectedEmail) {
+      const exists = emails.some(e => e._id === selectedEmail._id);
+      if (!exists) {
+        setSelectedEmail(null);
+      }
+    }
+  }, [selectedAccount, emails, selectedEmail]);
+
   // ============================================
   // DATA LOADING
   // ============================================
@@ -444,12 +458,24 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
         setSelectedAccount(targetAcc);
         loadEmails(targetAcc);
         localStorage.removeItem('tmail_select_account');
-      } else if (sortedAccounts.length > 0 && !selectedAccount) {
-        // Prioritize selecting current user's own account
-        const userAcc = sortedAccounts.find(a => a.owner?.username === user?.username);
-        const defaultAcc = userAcc || sortedAccounts[0];
-        setSelectedAccount(defaultAcc);
-        loadEmails(defaultAcc);
+      } else if (sortedAccounts.length > 0) {
+        // If there's currently a selectedAccount, verify if it still exists in the list
+        const exists = sortedAccounts.find(a => a.address === selectedAccount?.address);
+        if (exists) {
+          // If it exists, keep it but reload emails just in case
+          setSelectedAccount(exists);
+        } else {
+          // Otherwise select default (e.g. user's own account or first account)
+          const userAcc = sortedAccounts.find(a => a.owner?.username === user?.username);
+          const defaultAcc = userAcc || sortedAccounts[0];
+          setSelectedAccount(defaultAcc);
+          loadEmails(defaultAcc);
+        }
+      } else {
+        // No accounts remaining
+        setSelectedAccount(null);
+        setEmails([]);
+        setSelectedEmail(null);
       }
     } catch (err: any) {
       showToast(`${t('failedToLoadAccounts')}: ${err.message}`, 'error');
@@ -527,9 +553,9 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     try {
       await api.accounts.remove(address);
       if (!user) removeGuestAccount(address);
-      setAccounts(prev => prev.filter(a => a.address !== address));
+      const remaining = accounts.filter(a => a.address !== address);
+      setAccounts(remaining);
       if (selectedAccount?.address === address) {
-        const remaining = accounts.filter(a => a.address !== address);
         if (remaining.length > 0) handleSelectAccount(remaining[0]);
         else { setSelectedAccount(null); setEmails([]); setSelectedEmail(null); }
       }
