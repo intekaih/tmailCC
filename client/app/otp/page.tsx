@@ -281,9 +281,8 @@ export default function OTPPage() {
     <div className="otp-page">
       <AnimatedBackground variant="gradient" intensity="low" />
       <div 
-        className="otp-container" 
+        className={`otp-container ${verified ? 'verified-wide' : ''}`}
         style={{ 
-          maxWidth: verified ? '900px' : '460px', 
           width: '100%', 
           transition: 'max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
         }}
@@ -752,6 +751,7 @@ export default function OTPPage() {
       <style jsx>{`
         .otp-container {
           transition: max-width 0.3s ease;
+          max-width: 460px;
         }
         .otp-container.verified-wide {
           max-width: 900px;
@@ -770,6 +770,61 @@ export default function OTPPage() {
           flex-direction: column;
           gap: 12px;
           width: 100%;
+        }
+
+        @media (min-width: 769px) {
+          .otp-container.verified-wide {
+            height: 90vh;
+            max-height: 800px;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+          }
+          .verified-section {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            height: 100%;
+          }
+          .otp-columns {
+            flex: 1;
+            overflow: hidden;
+            height: 100%;
+            align-items: stretch;
+          }
+          .otp-column-left {
+            height: 100%;
+            overflow: hidden;
+          }
+          .otp-column-right {
+            height: 100%;
+          }
+          .email-section {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+          }
+          .email-list-otp {
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 6px;
+          }
+          .email-list-otp::-webkit-scrollbar {
+            width: 6px;
+          }
+          .email-list-otp::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .email-list-otp::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+          }
+          .email-list-otp::-webkit-scrollbar-thumb:hover {
+            background: var(--border-light);
+          }
         }
         @media (max-width: 768px) {
           .otp-columns {
