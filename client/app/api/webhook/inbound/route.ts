@@ -12,10 +12,19 @@ function isMissingColumn(error: any, columnName: string) {
   return error?.code === 'PGRST204' || error?.code === '42703' || String(error?.message || '').includes(columnName);
 }
 
+
+
+const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB
+
 /**
  * POST /api/webhook/inbound
  */
 export async function POST(request: NextRequest) {
+  // Body size check
+  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+  if (contentLength > MAX_BODY_SIZE) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
   const webhookSecret = request.headers.get('x-webhook-secret') || request.headers.get('x-tmail-secret');
   const expectedSecret = process.env.WEBHOOK_SECRET;
 
@@ -24,8 +33,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Webhook is not configured' }, { status: 503 });
   }
 
-  if (webhookSecret !== expectedSecret) {
-    console.warn('[Webhook] Invalid or missing webhook secret');
+  if (!webhookSecret) {
+    console.warn('[Webhook] Missing webhook secret header');
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  // Hash both values first to ensure equal length for timingSafeEqual
+  const receivedHash = crypto.createHash('sha256').update(webhookSecret).digest();
+  const expectedHash = crypto.createHash('sha256').update(expectedSecret).digest();
+  if (!crypto.timingSafeEqual(receivedHash, expectedHash)) {
+    console.warn('[Webhook] Invalid webhook secret');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

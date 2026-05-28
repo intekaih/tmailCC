@@ -157,7 +157,7 @@ export function showNotification(
     verificationCode: options?.verificationCode || null
   };
 
-  const notificationOptions: NotificationOptions = {
+  const notificationOptions: any = {
     body,
     icon: options?.icon || '/favicon.ico',
     tag: options?.tag,

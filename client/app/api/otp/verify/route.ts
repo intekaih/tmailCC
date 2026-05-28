@@ -5,6 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getRateStore } from '@/lib/rateStore';
+import { decrypt, isEncrypted } from '@/lib/encryption';
+
+// Static imports with graceful fallback for serverless environments
+let ImapFlowModule: any = null;
+let simpleParserModule: any = null;
+try {
+  ImapFlowModule = require('imapflow');
+  simpleParserModule = require('mailparser');
+} catch {
+  // imapflow/mailparser not available in this environment
+}
 
 function hashAccessKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
@@ -13,9 +24,28 @@ function hashAccessKey(key: string): string {
 function verifyOtpKey(row: any, accessKey: string): boolean {
   if (!row) return false;
   if (row.access_key_hash) {
-    return row.access_key_hash === hashAccessKey(accessKey);
+    const computedHash = hashAccessKey(accessKey);
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(computedHash, 'hex'),
+        Buffer.from(row.access_key_hash, 'hex')
+      );
+    } catch {
+      return false;
+    }
   }
-  return row.access_key === accessKey;
+  // Legacy plaintext fallback — compare safely
+  if (row.access_key) {
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(row.access_key),
+        Buffer.from(accessKey)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 function extractOTP(text: string | null): string | null {
@@ -122,13 +152,13 @@ export async function POST(request: NextRequest) {
     const rateStore = getRateStore();
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 
-    // Simple rate limiting
+    // Rate limiting — balanced limits for OTP endpoint
     const minuteKey = `otp:${ip}:minute`;
     const dayKey = `otp:${ip}:day`;
     const minuteCount = await rateStore.incr(minuteKey, 60);
     const dayCount = await rateStore.incr(dayKey, 86400);
 
-    if (minuteCount > 100 || dayCount > 1000) {
+    if (minuteCount > 30 || dayCount > 300) {
       return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
     }
 
@@ -155,14 +185,19 @@ export async function POST(request: NextRequest) {
 
       if (parent) {
         // Scan via IMAP
-        const { ImapFlow } = require('imapflow');
-        const { simpleParser } = require('mailparser');
+        if (!ImapFlowModule || !simpleParserModule) {
+          return NextResponse.json({ error: 'IMAP modules not available in this environment' }, { status: 503 });
+        }
+        const { ImapFlow } = ImapFlowModule;
+        const { simpleParser } = simpleParserModule;
+
+        const imapPassword = isEncrypted(parent.app_password) ? decrypt(parent.app_password) : parent.app_password;
 
         const client = new ImapFlow({
           host: 'imap.gmail.com',
           port: 993,
           secure: true,
-          auth: { user: parent.address, pass: parent.app_password },
+          auth: { user: parent.address, pass: imapPassword },
           logger: false,
         });
 
@@ -258,7 +293,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ emails: result, address: addressLower });
   } catch (err) {
-    console.error('[OTP] POST /verify error:', err);
+    console.error('[OTP] POST /verify error:', err instanceof Error ? err.message : 'Unknown error');
     return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
   }
 }

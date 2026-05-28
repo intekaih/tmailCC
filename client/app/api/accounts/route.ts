@@ -9,6 +9,7 @@ import Joi from 'joi';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { generateGuestToken } from '@/lib/guestAuth';
 
 function generateRandomString(length = 12): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -135,7 +136,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (domain) query = query.eq('domain', domain);
-    if (search) query = query.ilike('address', `%${search}%`);
+    if (search) {
+      // Escape LIKE special characters to prevent pattern injection
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      query = query.ilike('address', `%${escapedSearch}%`);
+    }
 
     query = query.order('created_at', { ascending: false }).range(skip, skip + limit - 1);
 
@@ -221,6 +226,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create account
+    const isGuestAccount = userId === null;
+    const guestTokenData = isGuestAccount ? generateGuestToken() : null;
+
     const { data: account, error: insertError } = await supabaseAdmin!
       .from('accounts')
       .insert({
@@ -228,6 +236,7 @@ export async function POST(request: NextRequest) {
         local_part: localPart,
         domain: value.domain.toLowerCase(),
         user_id: userId,
+        guest_owner_token_hash: guestTokenData?.hash || null,
       })
       .select()
       .single();
@@ -259,7 +268,14 @@ export async function POST(request: NextRequest) {
       owner = profile;
     }
 
-    return NextResponse.json(formatAccount({ ...account, owner }, true), { status: 201 });
+    const formatted = formatAccount({ ...account, owner }, true);
+
+    // Include guest token in response (only returned once, on creation)
+    if (guestTokenData) {
+      return NextResponse.json({ ...formatted, guestToken: guestTokenData.token }, { status: 201 });
+    }
+
+    return NextResponse.json(formatted, { status: 201 });
   } catch (err) {
     console.error('[Accounts] POST / unexpected error:', err);
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 });

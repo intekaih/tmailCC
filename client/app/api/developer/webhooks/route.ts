@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
 import { WEBHOOK_EVENTS } from '@/lib/constants';
+import { encrypt } from '@/lib/encryption';
 
 export type WebhookEvent = typeof WEBHOOK_EVENTS[number];
 
@@ -55,10 +56,37 @@ function generateWebhookSecret(): { raw: string; hint: string } {
   return { raw, hint };
 }
 
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]',
+  'metadata.google.internal', 'metadata.google',
+  '169.254.169.254', // AWS/GCP metadata endpoint
+]);
+
+function isPrivateIP(hostname: string): boolean {
+  if (BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) return true;
+  const parts = hostname.split('.').map(Number);
+  if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+    if (parts[0] === 10) return true;                                      // 10.0.0.0/8
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
+    if (parts[0] === 192 && parts[1] === 168) return true;                 // 192.168.0.0/16
+    if (parts[0] === 169 && parts[1] === 254) return true;                 // 169.254.0.0/16
+    if (parts[0] === 127) return true;                                     // 127.0.0.0/8
+    if (parts[0] === 0) return true;                                       // 0.0.0.0/8
+  }
+  return false;
+}
+
 function isValidUrl(urlString: string): boolean {
   try {
-    const url = new URL(urlString);
-    return url.protocol === 'https:' || url.protocol === 'http:';
+    const parsed = new URL(urlString);
+    // Only allow HTTP/HTTPS schemes
+    if (!['https:', 'http:'].includes(parsed.protocol)) return false;
+    // Enforce HTTPS in production
+    const isDev = process.env.NODE_ENV === 'development';
+    if (parsed.protocol === 'http:' && !isDev) return false;
+    // Block private/internal IPs (SSRF protection)
+    if (isPrivateIP(parsed.hostname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -135,6 +163,9 @@ export async function POST(request: NextRequest) {
 
     const { raw, hint } = generateWebhookSecret();
 
+    // Encrypt secret before storing — raw is only returned once in response
+    const encryptedSecret = encrypt(raw);
+
     const { data: webhook, error } = await supabaseAdmin!
       .from('webhooks')
       .insert({
@@ -142,7 +173,7 @@ export async function POST(request: NextRequest) {
         url: url.trim(),
         name: name.trim(),
         events: validEvents,
-        secret: raw,
+        secret: encryptedSecret,
         secret_hint: hint,
         is_active: true,
       })

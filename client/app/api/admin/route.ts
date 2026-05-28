@@ -156,7 +156,11 @@ async function handleGetUsers(searchParams: URLSearchParams) {
   let query = supabaseAdmin!.from('profiles').select('id, username, role, is_active, email_count, preferences, created_at, last_login', { count: 'exact' });
 
   if (role) query = query.eq('role', role);
-  if (search) query = query.ilike('username', `%${search}%`);
+  if (search) {
+    // Escape LIKE special characters to prevent pattern injection
+    const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+    query = query.ilike('username', `%${escapedSearch}%`);
+  }
 
   query = query.order('created_at', { ascending: false }).range(skip, skip + limit - 1);
 

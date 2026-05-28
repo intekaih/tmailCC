@@ -4,6 +4,7 @@
  */
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { encrypt, decrypt, isEncrypted } from '@/lib/encryption';
 
 // ============================================
 // Configuration
@@ -82,6 +83,7 @@ export async function createWebhook(
   if (!supabaseAdmin) throw new Error('Database not configured');
 
   const { secret, hint } = generateWebhookSecret();
+  const encryptedSecret = encrypt(secret);
 
   const { data, error } = await supabaseAdmin
     .from('webhooks')
@@ -90,7 +92,7 @@ export async function createWebhook(
       url,
       name,
       events,
-      secret,
+      secret: encryptedSecret,
       secret_hint: hint,
     })
     .select()
@@ -231,6 +233,65 @@ export async function deleteWebhook(webhookId: string, userId: string): Promise<
 }
 
 // ============================================
+// SSRF Protection
+// ============================================
+
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]',
+  'metadata.google.internal', 'metadata.google',
+  '169.254.169.254', // AWS/GCP metadata endpoint
+]);
+
+function isPrivateIP(hostname: string): boolean {
+  // Check blocked hostnames
+  if (BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) return true;
+
+  // Check private IP ranges
+  const parts = hostname.split('.').map(Number);
+  if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+    // 10.0.0.0/8
+    if (parts[0] === 10) return true;
+    // 172.16.0.0/12
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    // 192.168.0.0/16
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    // 169.254.0.0/16 (link-local)
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    // 127.0.0.0/8 (loopback)
+    if (parts[0] === 127) return true;
+    // 0.0.0.0/8
+    if (parts[0] === 0) return true;
+  }
+
+  return false;
+}
+
+function validateWebhookUrl(url: string): { valid: boolean; error?: string } {
+  try {
+    const parsed = new URL(url);
+
+    // Enforce HTTPS in production to prevent MITM and reduce DNS rebinding risk.
+    // HTTP is only allowed in development for localhost testing.
+    const isDev = process.env.NODE_ENV === 'development';
+    if (parsed.protocol === 'http:' && !isDev) {
+      return { valid: false, error: 'HTTPS is required for webhook URLs in production' };
+    }
+    if (!['https:', 'http:'].includes(parsed.protocol)) {
+      return { valid: false, error: `Unsupported protocol: ${parsed.protocol}` };
+    }
+
+    // Block private/internal IPs (SSRF protection)
+    if (isPrivateIP(parsed.hostname)) {
+      return { valid: false, error: 'Webhook URL cannot target internal/private addresses' };
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Invalid URL' };
+  }
+}
+
+// ============================================
 // Webhook Delivery (using fetch instead of http/https)
 // ============================================
 
@@ -240,8 +301,21 @@ async function sendWebhookRequest(
   payload: unknown,
 ): Promise<WebhookDeliveryResult> {
   try {
+    // SSRF protection: validate URL before sending
+    const urlCheck = validateWebhookUrl(webhook.url);
+    if (!urlCheck.valid) {
+      return {
+        success: false,
+        statusCode: null,
+        body: null,
+        error: `SSRF blocked: ${urlCheck.error}`,
+      };
+    }
+
+    // Decrypt secret for HMAC signature
+    const plaintextSecret = isEncrypted(webhook.secret) ? decrypt(webhook.secret) : webhook.secret;
     const timestamp = Math.floor(Date.now() / 1000);
-    const signature = generateSignature(webhook.secret, timestamp, payload);
+    const signature = generateSignature(plaintextSecret, timestamp, payload);
     const body = JSON.stringify(payload);
 
     const controller = new AbortController();
@@ -266,10 +340,13 @@ async function sendWebhookRequest(
       const responseBody = await response.text().catch(() => '');
       const success = response.status >= 200 && response.status < 300;
 
+      // Truncate response body to limit sensitive data storage
+      const truncatedBody = responseBody.substring(0, 500);
+
       return {
         success,
         statusCode: response.status,
-        body: responseBody.substring(0, 1000),
+        body: truncatedBody,
         error: success ? null : `HTTP ${response.status}`,
       };
     } catch (fetchErr) {

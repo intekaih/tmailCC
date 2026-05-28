@@ -22,12 +22,16 @@ const OTP_PATTERNS = [
 export function extractOtp(text: string): string[] | null {
   if (!text) return null;
 
+  // Limit input length to prevent ReDoS on large payloads
+  const truncated = text.length > 10000 ? text.substring(0, 10000) : text;
+
   const allMatches = new Set<string>();
 
   for (const pattern of OTP_PATTERNS) {
-    // Reset lastIndex for global regex patterns
-    pattern.lastIndex = 0;
-    const matches = text.match(pattern);
+    // Create a new regex instance to avoid shared lastIndex state
+    const regex = new RegExp(pattern.source, pattern.flags);
+    regex.lastIndex = 0;
+    const matches = truncated.match(regex);
     if (matches) {
       matches.forEach(m => {
         const code = m.replace(/[^A-Z0-9]/gi, '').toUpperCase();
@@ -42,20 +46,30 @@ export function extractOtp(text: string): string[] | null {
 }
 
 /**
- * Simple HTML sanitizer - removes dangerous elements
- * For production, consider using DOMPurify
+ * Server-side HTML sanitizer - strips ALL HTML for safe text extraction.
+ * For display rendering, client-side EmailView.tsx has a DOM-based sanitizer.
+ * This function is used only for OTP extraction from email content on the server.
  */
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
 
   return html
+    // Remove all script/style/svg/math blocks with their content
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\bon\w+\s*=/gi, 'data-removed=')
-    .replace(/javascript:/gi, '')
-    .replace(/<iframe/gi, '<removed-iframe')
-    .replace(/<object/gi, '<removed-object')
-    .replace(/<embed/gi, '<removed-embed')
-    .replace(/<form/gi, '<removed-form')
-    .replace(/<input/gi, '<removed-input')
-    .replace(/<button/gi, '<removed-button');
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '')
+    .replace(/<math\b[^<]*(?:(?!<\/math>)<[^<]*)*<\/math>/gi, '')
+    // Remove all HTML tags
+    .replace(/<[^>]+>/g, ' ')
+    // Decode common HTML entities
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
 }

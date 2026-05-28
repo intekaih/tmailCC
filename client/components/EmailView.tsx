@@ -120,28 +120,65 @@ function sanitizeEmailHtml(html: string): string {
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const blockedTags = ['script', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'form', 'input', 'button'];
 
+  // Blocklist: dangerous tags including SVG animation, math, and import vectors
+  const blockedTags = [
+    'script', 'iframe', 'object', 'embed', 'link', 'meta', 'base',
+    'form', 'input', 'button', 'textarea', 'select', 'option',
+    // SVG XSS vectors
+    'animate', 'animatemotion', 'animatetransform', 'set',
+    // Math XSS vectors
+    'math', 'maction', 'semantics', 'annotation-xml',
+    // Other dangerous elements
+    'template', 'slot', 'portal', 'dialog',
+  ];
+
+  // Remove blocked tags (case-insensitive via querySelectorAll)
   doc.querySelectorAll(blockedTags.join(',')).forEach(node => node.remove());
+
+  // Dangerous attribute prefixes and names
+  const dangerousAttrPrefixes = ['on', 'form', 'xlink', 'xml', 'xmlns'];
+  const dangerousAttrs = new Set([
+    'srcdoc', 'style', 'formaction', 'action', 'data', 'dynsrc', 'lowsrc',
+    'background', 'poster', 'ping', 'loading', 'is', 'integrity',
+  ]);
+
   doc.querySelectorAll('*').forEach((el) => {
+    const tag = el.tagName.toLowerCase();
+
+    // Remove any remaining SVG/XML namespace elements that could bypass
+    if (tag.includes(':') || el.namespaceURI?.includes('math')) {
+      el.remove();
+      return;
+    }
+
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();
-      const value = attr.value.trim();
+      const value = attr.value.trim().toLowerCase();
 
-      if (name.startsWith('on') || name === 'srcdoc' || name === 'style') {
+      // Block all event handlers (on*) — catches onbegin, onload, onerror, etc.
+      if (dangerousAttrPrefixes.some(p => name.startsWith(p)) || dangerousAttrs.has(name)) {
         el.removeAttribute(attr.name);
         continue;
       }
 
-      if (['href', 'src', 'xlink:href', 'formaction'].includes(name)) {
-        if (!isAllowedUrl(value, name === 'src')) {
+      // Block dangerous URL schemes in any attribute
+      if (value.startsWith('javascript:') || value.startsWith('vbscript:') || value.startsWith('data:text/html')) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+
+      // Validate URL attributes
+      if (['href', 'src'].includes(name)) {
+        if (!isAllowedUrl(attr.value.trim(), name === 'src')) {
           el.removeAttribute(attr.name);
           continue;
         }
       }
     }
 
-    if (el.tagName.toLowerCase() === 'a') {
+    // Force safe link behavior
+    if (tag === 'a') {
       el.setAttribute('target', '_blank');
       el.setAttribute('rel', 'noopener noreferrer');
     }

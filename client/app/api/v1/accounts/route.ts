@@ -118,8 +118,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const domain = searchParams.get('domain');
     const search = searchParams.get('search');
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const skip = parseInt(searchParams.get('skip') || '0', 10);
+    // Bounds checking: clamp limit to [1, 100] and skip to [0, ∞)
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 100);
+    const skip = Math.max(parseInt(searchParams.get('skip') || '0', 10) || 0, 0);
 
     let query = supabaseAdmin
       .from('accounts')
@@ -127,7 +128,11 @@ export async function GET(request: NextRequest) {
       .eq('user_id', auth.apiKey.userId);
 
     if (domain) query = query.eq('domain', domain);
-    if (search) query = query.ilike('address', `%${search}%`);
+    if (search) {
+      // Escape LIKE special characters to prevent pattern injection
+      const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+      query = query.ilike('address', `%${escapedSearch}%`);
+    }
 
     query = query
       .order('created_at', { ascending: false })

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { checkGuestAccess } from '@/lib/guestAuth';
 
 async function authenticate(request: NextRequest, allowGuest = false) {
   const authHeader = request.headers.get('authorization');
@@ -32,7 +33,7 @@ async function authenticate(request: NextRequest, allowGuest = false) {
 }
 
 async function getAccountByAddress(address: string) {
-  const { data: account, error } = await supabaseAdmin!.from('accounts').select('id, address, user_id').eq('address', address.toLowerCase()).maybeSingle();
+  const { data: account, error } = await supabaseAdmin!.from('accounts').select('id, address, user_id, guest_owner_token_hash').eq('address', address.toLowerCase()).maybeSingle();
   if (error) throw error;
   return account;
 }
@@ -83,11 +84,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (!auth.isGuest && auth.user) {
+    // Check access
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     let query = supabaseAdmin!.from('emails').select('*', { count: 'exact' }).eq('account_id', account.id).eq('is_deleted', false).order('received_at', { ascending: false }).range(skip, skip + limit - 1);
@@ -141,11 +149,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (!auth.isGuest && auth.user) {
+    // Check access
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { error, count } = await supabaseAdmin!.from('emails').update({ is_deleted: true }).eq('account_id', account.id).eq('is_deleted', false);

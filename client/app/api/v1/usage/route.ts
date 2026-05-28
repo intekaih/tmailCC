@@ -13,7 +13,7 @@ import {
 import * as apiKeyService from '@/lib/services/apiKeyService';
 
 export async function GET(request: NextRequest) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['usage:read']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 

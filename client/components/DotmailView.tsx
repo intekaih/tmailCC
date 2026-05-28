@@ -273,7 +273,7 @@ export default function DotmailView({ account }: DotmailViewProps) {
                   </p>
                 </div>
                 <button
-                  onClick={fetchOtp}
+                  onClick={() => fetchOtp(true)}
                   className="btn btn-secondary btn-sm flex items-center gap-1.5 mt-2"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

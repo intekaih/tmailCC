@@ -5,10 +5,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { checkGuestAccess } from '@/lib/guestAuth';
 
-async function authenticate(request: NextRequest) {
+async function authenticate(request: NextRequest, allowGuest = false) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (allowGuest) return { user: null, isGuest: true };
     return { error: 'No token provided', status: 401 };
   }
 
@@ -27,7 +29,7 @@ async function authenticate(request: NextRequest) {
     return { error: 'Account is disabled', status: 403 };
   }
 
-  return { user: { ...decoded, ...profile, role: profile.role } };
+  return { user: { ...decoded, ...profile, role: profile.role }, isGuest: false };
 }
 
 function formatEmail(row: any) {
@@ -58,7 +60,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticate(request);
+    // Allow guest access (matches /api/emails/route.ts pattern)
+    const auth = await authenticate(request, true);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -71,17 +74,24 @@ export async function GET(
       return NextResponse.json({ error: 'Email not found' }, { status: 404 });
     }
 
-    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id').eq('id', email.account_id).maybeSingle();
+    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id, guest_owner_token_hash').eq('id', email.account_id).maybeSingle();
 
     if (accountError || !account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (auth.user) {
+    // Check access — same pattern as /api/emails/route.ts
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Mark as read
@@ -102,7 +112,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticate(request);
+    // Allow guest access — guest can delete individual emails from their accounts
+    const auth = await authenticate(request, true);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -115,17 +126,24 @@ export async function DELETE(
       return NextResponse.json({ error: 'Email not found' }, { status: 404 });
     }
 
-    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id').eq('id', email.account_id).maybeSingle();
+    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id, guest_owner_token_hash').eq('id', email.account_id).maybeSingle();
 
     if (accountError || !account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (auth.user) {
+    // Check access — same pattern as /api/emails/route.ts
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { error } = await supabaseAdmin!.from('emails').update({ is_deleted: true }).eq('id', id);

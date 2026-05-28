@@ -115,8 +115,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       address: key.address,
-      accessKey: key.access_key,
-      credential: `${key.address}|${key.access_key}`,
+      accessKey: accessKey,  // Return locally-generated key, NOT DB value
+      credential: `${key.address}|${accessKey}`,
       note: key.note,
       createdAt: key.created_at,
     }, { status: 201 });

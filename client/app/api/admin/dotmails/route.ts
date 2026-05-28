@@ -8,6 +8,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { encrypt, decrypt, isEncrypted } from '@/lib/encryption';
+
+// Static imports with graceful fallback for serverless environments
+let ImapFlowModule: any = null;
+let mailparserModule: any = null;
+try {
+  ImapFlowModule = require('imapflow');
+  mailparserModule = require('mailparser');
+} catch {
+  // imapflow/mailparser not available in this environment
+}
 
 async function requireAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -87,16 +98,19 @@ function normalizeDotmail(email: string): string {
 // ============================================
 async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotmailAddress: string): Promise<{ otp: string | null; from: string; subject: string }> {
   // Dynamic require to avoid webpack bundling these Node.js-only modules
-  const { ImapFlow } = require('imapflow');
-  const { simpleParser } = require('mailparser');
+  if (!ImapFlowModule || !mailparserModule) {
+    throw new Error('IMAP modules not available in this environment');
+  }
+  const { ImapFlow } = ImapFlowModule;
+  const { simpleParser } = mailparserModule;
 
-  const client = new ImapFlow({
-    host: 'imap.gmail.com',
-    port: 993,
-    secure: true,
-    auth: { user: parentEmail, pass: appPassword },
-    logger: false,
-  });
+    const client = new ImapFlow({
+      host: 'imap.gmail.com',
+      port: 993,
+      secure: true,
+      auth: { user: parentEmail, pass: isEncrypted(appPassword) ? decrypt(appPassword) : appPassword },
+      logger: false,
+    });
 
   try {
     await client.connect();
@@ -249,6 +263,7 @@ export async function GET(request: NextRequest) {
 
       result.push({
         ...parent,
+        app_password: '********',  // Never expose password in API response
         dotmails: dotmails || [],
       });
     }
@@ -283,16 +298,19 @@ export async function POST(request: NextRequest) {
       const [localPart, domainPart] = address.toLowerCase().split('@');
       const cleanAddress = `${localPart.replace(/\./g, '')}@${domainPart || 'gmail.com'}`;
 
+      // Encrypt app password before storing
+      const encryptedPassword = encrypt(app_password);
+
       const { data, error } = await supabaseAdmin!
         .from('gmail_parents')
-        .upsert({ address: cleanAddress, app_password }, { onConflict: 'address' })
+        .upsert({ address: cleanAddress, app_password: encryptedPassword }, { onConflict: 'address' })
         .select()
         .single();
 
       if (error) {
         return NextResponse.json({ error: 'Failed to add parent' }, { status: 500 });
       }
-      return NextResponse.json({ parent: data }, { status: 201 });
+      return NextResponse.json({ parent: { ...data, app_password: '********' } }, { status: 201 });
     }
 
     // --- Delete parent Gmail ---
@@ -318,9 +336,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'id and app_password are required' }, { status: 400 });
       }
 
+      // Encrypt app password before updating
+      const encryptedPassword = encrypt(app_password);
+
       const { data, error } = await supabaseAdmin!
         .from('gmail_parents')
-        .update({ app_password })
+        .update({ app_password: encryptedPassword })
         .eq('id', id)
         .select()
         .single();
@@ -328,7 +349,7 @@ export async function POST(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: 'Failed to update parent' }, { status: 500 });
       }
-      return NextResponse.json({ parent: data });
+      return NextResponse.json({ parent: { ...data, app_password: '********' } });
     }
 
     // --- Check parent Gmail live status ---
@@ -346,13 +367,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
       }
 
-      const { ImapFlow } = require('imapflow');
+      if (!ImapFlowModule) {
+        return NextResponse.json({ error: 'IMAP modules not available' }, { status: 503 });
+      }
+      const { ImapFlow } = ImapFlowModule;
 
       const client = new ImapFlow({
         host: 'imap.gmail.com',
         port: 993,
         secure: true,
-        auth: { user: parent.address, pass: parent.app_password },
+        auth: { user: parent.address, pass: isEncrypted(parent.app_password) ? decrypt(parent.app_password) : parent.app_password },
         logger: false,
       });
 

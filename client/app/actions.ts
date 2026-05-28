@@ -13,6 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { generateGuestToken } from '@/lib/guestAuth';
 
 // ============================================
 // TYPES
@@ -132,7 +133,10 @@ export async function createAccountAction(
       return { success: true, data: formatAccountRow(existing) };
     }
 
-    // Create account
+    // Create account with guest token if not authenticated
+    const isGuestAccount = userId === null;
+    const guestTokenData = isGuestAccount ? generateGuestToken() : null;
+
     const { data: account, error: insertError } = await supabaseAdmin
       .from('accounts')
       .insert({
@@ -140,6 +144,7 @@ export async function createAccountAction(
         local_part: safePart,
         domain: domain.toLowerCase(),
         user_id: userId,
+        guest_owner_token_hash: guestTokenData?.hash || null,
       })
       .select()
       .single();
@@ -152,7 +157,13 @@ export async function createAccountAction(
     }
 
     revalidatePath('/');
-    return { success: true, data: formatAccountRow(account) };
+    const formatted = formatAccountRow(account);
+    return {
+      success: true,
+      data: guestTokenData
+        ? { ...formatted, guestToken: guestTokenData.token } as any
+        : formatted,
+    };
   } catch (err) {
     console.error('[ServerAction] createAccount error:', err);
     return { success: false, error: 'Failed to create account' };
@@ -182,10 +193,17 @@ export async function deleteAccountAction(
       return { success: false, error: 'Account not found' };
     }
 
-    // Check access
+    // Check access - deny-by-default
     if (account.user_id) {
+      // Registered user account → must be owner or admin
       if (!user || (user.role !== 'admin' && account.user_id !== user.id)) {
         return { success: false, error: 'Access denied' };
+      }
+    } else {
+      // Guest account (user_id = NULL) → Server Actions cannot verify guest tokens
+      // Only allow if a logged-in admin is performing the action
+      if (!user || user.role !== 'admin') {
+        return { success: false, error: 'Access denied. Use API with guest token.' };
       }
     }
 
@@ -240,6 +258,11 @@ async function checkEmailAccess(emailId: string, user: any): Promise<{ success: 
   if (account.user_id) {
     if (!user || (user.role !== 'admin' && account.user_id !== user.id)) {
       return { success: false, error: 'Access denied' };
+    }
+  } else {
+    // Guest account → only admins can act via Server Actions
+    if (!user || user.role !== 'admin') {
+      return { success: false, error: 'Access denied. Use API with guest token.' };
     }
   }
 
@@ -374,6 +397,11 @@ export async function clearAllEmailsAction(
     if (account.user_id) {
       if (!user || (user.role !== 'admin' && account.user_id !== user.id)) {
         return { success: false, error: 'Access denied' };
+      }
+    } else {
+      // Guest account → only admins can act via Server Actions
+      if (!user || user.role !== 'admin') {
+        return { success: false, error: 'Access denied. Use API with guest token.' };
       }
     }
 

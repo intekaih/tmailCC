@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import Joi from 'joi';
+import { getRateStore } from '@/lib/rateStore';
 
 const registerSchema = Joi.object({
   username: Joi.string()
@@ -28,6 +29,21 @@ const registerSchema = Joi.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: prevent mass registration
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateStore = getRateStore();
+    const minuteKey = `register:${ip}:minute`;
+    const hourKey = `register:${ip}:hour`;
+    const minuteCount = await rateStore.incr(minuteKey, 60);
+    const hourCount = await rateStore.incr(hourKey, 3600);
+
+    if (minuteCount > 3 || hourCount > 10) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     // Parse request body
     let body;
     try {
@@ -65,22 +81,16 @@ export async function POST(request: NextRequest) {
       .eq('username', username.toLowerCase())
       .maybeSingle();
 
-    if (existingUsername) {
-      return NextResponse.json(
-        { error: 'Username already taken' },
-        { status: 409 }
-      );
-    }
-
     // Check if email already registered (via auth.users)
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingEmail = existingUsers?.users.find(
       (u) => u.email?.toLowerCase() === email.toLowerCase()
     );
 
-    if (existingEmail) {
+    // Return generic error to prevent enumeration
+    if (existingUsername || existingEmail) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: 'Username or email already registered' },
         { status: 409 }
       );
     }

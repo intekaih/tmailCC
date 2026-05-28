@@ -20,7 +20,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['webhooks:manage']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 
@@ -48,7 +48,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['webhooks:manage']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 
@@ -78,7 +78,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['webhooks:manage']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 

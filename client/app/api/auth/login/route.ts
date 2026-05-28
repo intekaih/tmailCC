@@ -5,14 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-
-function getJwtSecret() {
-  const secret = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('SUPABASE_JWT_SECRET or JWT_SECRET is required in production');
-  }
-  return secret || 'tmail-dev-secret-change-in-production';
-}
+import { getJwtSecret } from '@/lib/auth';
+import { getRateStore } from '@/lib/rateStore';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -21,6 +15,21 @@ const JWT_SECRET = getJwtSecret();
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: prevent brute-force login attempts
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateStore = getRateStore();
+    const minuteKey = `login:${ip}:minute`;
+    const hourKey = `login:${ip}:hour`;
+    const minuteCount = await rateStore.incr(minuteKey, 60);
+    const hourCount = await rateStore.incr(hourKey, 3600);
+
+    if (minuteCount > 5 || hourCount > 20) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { username, password, supabase_access_token, supabase_user_id } = body;
 
@@ -65,13 +74,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password via Supabase Auth API
+    // Use ANON_KEY (not SERVICE_ROLE_KEY) — the token endpoint only needs anon access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'apikey': anonKey,
       },
       body: JSON.stringify({ email: authUser.user.email, password }),
     });

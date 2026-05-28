@@ -4,14 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-
-function getJwtSecret() {
-  const secret = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('SUPABASE_JWT_SECRET or JWT_SECRET is required in production');
-  }
-  return secret || 'tmail-dev-secret-change-in-production';
-}
+import { getJwtSecret } from '@/lib/auth';
 
 const JWT_SECRET = getJwtSecret();
 

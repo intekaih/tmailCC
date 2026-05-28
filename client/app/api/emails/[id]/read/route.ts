@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { checkGuestAccess } from '@/lib/guestAuth';
 
 async function authenticate(request: NextRequest, allowGuest = false) {
   const authHeader = request.headers.get('authorization');
@@ -70,17 +71,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Email not found' }, { status: 404 });
     }
 
-    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id').eq('id', email.account_id).maybeSingle();
+    const { data: account, error: accountError } = await supabaseAdmin!.from('accounts').select('id, address, user_id, guest_owner_token_hash').eq('id', email.account_id).maybeSingle();
 
     if (accountError || !account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (!auth.isGuest && auth.user) {
+    // Check access
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: updated, error } = await supabaseAdmin!.from('emails').update({ is_read: isRead }).eq('id', id).select().maybeSingle();

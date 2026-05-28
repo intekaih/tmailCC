@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
+import { checkGuestAccess } from '@/lib/guestAuth';
 
 async function authenticate(request: NextRequest, allowGuest = false) {
   const authHeader = request.headers.get('authorization');
@@ -34,20 +35,22 @@ async function authenticate(request: NextRequest, allowGuest = false) {
 }
 
 function formatAccount(row: any, includeOwner = false) {
+  // Destructure to explicitly exclude sensitive fields
+  const { guest_owner_token_hash, ...safeRow } = row;
   return {
-    _id: row.id,
-    id: row.id,
-    address: row.address,
-    localPart: row.local_part,
-    domain: row.domain,
-    user: row.user_id,
-    createdAt: row.created_at,
-    lastActivity: row.last_activity,
-    emailCount: row.email_count || 0,
-    owner: includeOwner && row.owner ? {
-      id: row.owner.id,
-      username: row.owner.username,
-      role: row.owner.role,
+    _id: safeRow.id,
+    id: safeRow.id,
+    address: safeRow.address,
+    localPart: safeRow.local_part,
+    domain: safeRow.domain,
+    user: safeRow.user_id,
+    createdAt: safeRow.created_at,
+    lastActivity: safeRow.last_activity,
+    emailCount: safeRow.email_count || 0,
+    owner: includeOwner && safeRow.owner ? {
+      id: safeRow.owner.id,
+      username: safeRow.owner.username,
+      role: safeRow.owner.role,
     } : undefined,
   };
 }
@@ -79,11 +82,18 @@ export async function GET(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (!auth.isGuest && auth.user) {
+    // Check access
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get email counts
@@ -130,7 +140,7 @@ export async function DELETE(
 
     const { data: account } = await supabaseAdmin!
       .from('accounts')
-      .select('id, user_id, address')
+      .select('id, user_id, address, guest_owner_token_hash')
       .eq('address', decodedAddress)
       .maybeSingle();
 
@@ -138,11 +148,18 @@ export async function DELETE(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Check access for logged-in users
-    if (!auth.isGuest && auth.user) {
+    // Check access
+    if (auth.isGuest) {
+      const guestAccess = checkGuestAccess(request, account);
+      if (!guestAccess.allowed) {
+        return NextResponse.json({ error: guestAccess.error }, { status: guestAccess.status });
+      }
+    } else if (auth.user) {
       if (auth.user.role !== 'admin' && account.user_id !== auth.user.id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get email count before deletion

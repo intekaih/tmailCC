@@ -29,8 +29,8 @@ export async function GET(
     const userId = auth.apiKey.userId;
 
     const { searchParams } = request.nextUrl;
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const skip = parseInt(searchParams.get('skip') || '0', 10);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 100);
+    const skip = Math.max(parseInt(searchParams.get('skip') || '0', 10) || 0, 0);
     const unreadOnly = searchParams.get('unreadOnly');
 
     // Find account and verify ownership

@@ -16,7 +16,7 @@ import * as webhookService from '@/lib/services/webhookService';
  * POST /api/v1/webhooks - Create webhook
  */
 export async function POST(request: NextRequest) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['webhooks:manage']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
  * GET /api/v1/webhooks - List webhooks
  */
 export async function GET(request: NextRequest) {
-  const authResult = await authenticateApiKey(request);
+  const authResult = await authenticateApiKey(request, ['webhooks:manage']);
   if ('error' in authResult) return authResult.error;
   const { auth } = authResult;
 

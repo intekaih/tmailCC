@@ -109,9 +109,60 @@ export async function DELETE(
     return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
   }
 
-  await supabaseAdmin!.auth.admin.deleteUser(id).then(() => {}, err => console.error('[Admin] Auth delete error:', err));
+  try {
+    // Cascade cleanup: delete all user-owned data before removing auth user
+    // 1. Delete emails belonging to user's accounts
+    const { data: userAccounts } = await supabaseAdmin!
+      .from('accounts')
+      .select('id')
+      .eq('user_id', id);
 
-  await supabaseAdmin!.from('profiles').delete().eq('id', id).then(() => {}, err => console.error('[Admin] Profile delete error:', err));
+    if (userAccounts && userAccounts.length > 0) {
+      const accountIds = userAccounts.map((a: any) => a.id);
+      await supabaseAdmin!.from('emails').delete().in('account_id', accountIds);
+    }
 
-  return NextResponse.json({ message: 'User and all associated data deleted' });
+    // 2. Delete user's accounts
+    await supabaseAdmin!.from('accounts').delete().eq('user_id', id);
+
+    // 3. Delete webhook deliveries (via webhooks)
+    const { data: userWebhooks } = await supabaseAdmin!
+      .from('webhooks')
+      .select('id')
+      .eq('user_id', id);
+
+    if (userWebhooks && userWebhooks.length > 0) {
+      const webhookIds = userWebhooks.map((w: any) => w.id);
+      await supabaseAdmin!.from('webhook_deliveries').delete().in('webhook_id', webhookIds);
+    }
+
+    // 4. Delete webhooks
+    await supabaseAdmin!.from('webhooks').delete().eq('user_id', id);
+
+    // 5. Delete API usage logs (via api_keys)
+    const { data: userApiKeys } = await supabaseAdmin!
+      .from('api_keys')
+      .select('id')
+      .eq('user_id', id);
+
+    if (userApiKeys && userApiKeys.length > 0) {
+      const apiKeyIds = userApiKeys.map((k: any) => k.id);
+      await supabaseAdmin!.from('api_usage_logs').delete().in('api_key_id', apiKeyIds);
+    }
+
+    // 6. Delete API keys
+    await supabaseAdmin!.from('api_keys').delete().eq('user_id', id);
+
+    // 7. Delete auth user (this cascades to profile via FK)
+    await supabaseAdmin!.auth.admin.deleteUser(id);
+
+    // 8. Delete profile (safety net if FK cascade didn't fire)
+    await supabaseAdmin!.from('profiles').delete().eq('id', id);
+
+    console.log(`[Admin] User ${id} and all associated data deleted`);
+    return NextResponse.json({ message: 'User and all associated data deleted' });
+  } catch (err) {
+    console.error('[Admin] Delete user error:', err);
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+  }
 }
