@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
       }
 
-      const variants = generateSingleDotVariants(parent.address);
+      const variants = [parent.address, ...generateSingleDotVariants(parent.address)];
       const rows = variants.map(v => ({
         parent_id,
         address: v,
