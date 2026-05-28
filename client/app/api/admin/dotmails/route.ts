@@ -123,12 +123,28 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
           const parsed = await simpleParser(msg.source);
           const emailDate = parsed.date || new Date();
 
-          // Check that the email was actually sent to the specific dotmail
-          const toHeader = (parsed.to?.text || '').toLowerCase();
-          const ccHeader = (parsed.cc?.text || '').toLowerCase();
+          // Parse recipient headers directly from raw message source to avoid simpleParser anomalies
+          const rawSource = msg.source.toString('utf-8');
+          const headerEnd = rawSource.indexOf('\r\n\r\n');
+          const headersText = headerEnd !== -1 ? rawSource.substring(0, headerEnd).toLowerCase() : rawSource.toLowerCase();
+
+          const toHeaderMatch = headersText.match(/^to:\s*([\s\S]*?)(?=\r?\n[^\s]|$)/m);
+          const ccHeaderMatch = headersText.match(/^cc:\s*([\s\S]*?)(?=\r?\n[^\s]|$)/m);
+          
+          const toText = toHeaderMatch ? toHeaderMatch[1] : '';
+          const ccText = ccHeaderMatch ? ccHeaderMatch[1] : '';
           const dotmailUsername = dotmailAddress.toLowerCase().split('@')[0];
           
-          const isTargetDotmail = toHeader.includes(dotmailUsername) || ccHeader.includes(dotmailUsername);
+          const isTargetDotmail = toText.includes(dotmailUsername) || ccText.includes(dotmailUsername);
+          
+          console.log('[Dotmail OTP] Checking email:', {
+            subject: parsed.subject,
+            toHeader: toText.trim(),
+            ccHeader: ccText.trim(),
+            dotmailUsername,
+            isTargetDotmail
+          });
+
           if (!isTargetDotmail) continue;
 
           const textContent = parsed.text || '';
