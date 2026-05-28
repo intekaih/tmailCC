@@ -21,7 +21,7 @@ import {
   resetSeenEmailsTracker,
 } from '@/lib/RealtimeContext';
 import { broadcastToTabs, listenForTabMessages, FormattedEmail } from '@/lib/realtime';
-import { showNotification } from '@/lib/notification';
+import { showNotification, extractVerificationCode } from '@/lib/notification';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { DotsBounce, LoadingKeyframes } from '@/components/AnimatedLoader';
 import type { InitialServerData } from './types';
@@ -223,12 +223,14 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     if (cb.notificationsEnabled && document.visibilityState === 'hidden') {
       requestNotificationPermission().then((permission) => {
         if (permission === 'granted') {
+          const verificationCode = extractVerificationCode(email.subject, email.text);
           showNotification(
             email.fromName || email.from,
             email.subject,
             {
               tag: `email-${currentAccount.id}`,
               data: { emailId: email._id, accountId: currentAccount.id },
+              verificationCode,
               onClick: () => {
                 window.focus();
                 window.dispatchEvent(
@@ -307,6 +309,42 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     window.addEventListener('tmail:focus-email', handler);
     return () => window.removeEventListener('tmail:focus-email', handler);
   }, [emails]);
+
+  // ============================================
+  // GLOBAL TOAST LISTENER & URL PARAMS
+  // ============================================
+
+  useEffect(() => {
+    const handleToast = ((event: CustomEvent) => {
+      const { message, type } = event.detail;
+      showToast(message, type || 'info');
+    }) as EventListener;
+
+    window.addEventListener('tmail:show-toast', handleToast);
+
+    // Handle startup parameters (from sw.js when no open window existed)
+    const urlParams = new URLSearchParams(window.location.search);
+    const copyCode = urlParams.get('copyCode');
+    const focusEmail = urlParams.get('focusEmail');
+
+    if (copyCode) {
+      navigator.clipboard.writeText(copyCode)
+        .then(() => {
+          showToast(`Đã sao chép mã xác thực: ${copyCode}`, 'success');
+        })
+        .catch(err => console.error(err));
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (focusEmail) {
+      window.dispatchEvent(new CustomEvent('tmail:focus-email', { detail: { emailId: focusEmail } }));
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    return () => {
+      window.removeEventListener('tmail:show-toast', handleToast);
+    };
+  }, []);
 
   // ============================================
   // INITIALIZATION
