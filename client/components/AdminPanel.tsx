@@ -223,6 +223,27 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
       toast(err.message || 'Lỗi khi đồng bộ Cloudflare', 'error');
     } finally {
       setSyncLoading(false);
+  }
+
+  async function handleCheckConfigureDomain(domainName: string) {
+    setSyncLoading(true);
+    setError('');
+    setSyncResult(null);
+    try {
+      const result = await api.admin.syncCloudflare([domainName]);
+      setSyncResult(result);
+      if (result.errors.length > 0) {
+        toast(`Lỗi khi cấu hình domain ${domainName}: ${result.errors.join('; ')}`, 'error');
+      } else {
+        toast(`Đã cấu hình thành công domain ${domainName}`, 'success');
+        loadDomains();
+        onDomainsChanged?.();
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast(err.message || 'Lỗi khi cấu hình domain', 'error');
+    } finally {
+      setSyncLoading(false);
     }
   }
 
@@ -724,9 +745,24 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
                           <span className="status-dot inactive" />
                         )}
                       </div>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDomain(d._id)}>
-                        {t('remove')}
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                          className="btn btn-ghost btn-sm" 
+                          onClick={() => handleCheckConfigureDomain(d.domain)}
+                          disabled={syncLoading}
+                          title="Kiểm tra & Cấu hình Cloudflare"
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '2px' }}>
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Cấu hình
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDomain(d._id)}>
+                          {t('remove')}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

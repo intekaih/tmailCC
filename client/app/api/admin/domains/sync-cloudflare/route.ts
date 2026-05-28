@@ -195,12 +195,12 @@ export async function POST(request: NextRequest) {
 
     const existingSet = new Set((existingDomains || []).map((d: any) => d.domain.toLowerCase()));
 
-    // Find new domains to add
-    let newDomains = cloudflareDomains.filter(d => !existingSet.has(d));
-
-    // If user specified a list of domains to sync, only process those
+    // Find domains to process (if selectedDomains is provided, we process those, otherwise we only process the new ones not in DB)
+    let domainsToProcess: string[] = [];
     if (selectedDomains) {
-      newDomains = newDomains.filter(d => selectedDomains!.includes(d));
+      domainsToProcess = cloudflareDomains.filter(d => selectedDomains!.includes(d));
+    } else {
+      domainsToProcess = cloudflareDomains.filter(d => !existingSet.has(d));
     }
 
     // Insert new domains and configure them
@@ -208,32 +208,37 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
     const configLogs: string[] = [];
 
-    for (const domain of newDomains) {
+    for (const domain of domainsToProcess) {
       const zoneInfo = cfData.result.find(z => z.name.toLowerCase() === domain);
       if (!zoneInfo) continue;
 
-      // 1. Insert into DB
-      const { error: insertError } = await supabaseAdmin
-        .from('domains')
-        .insert({
-          domain,
-          label: '',
-          is_active: true,
-          is_default: false,
-          added_by: auth.user!.id,
-          note: 'Synced from Cloudflare',
-        });
+      // 1. Insert into DB if not exists
+      const isAlreadyInDb = existingSet.has(domain);
+      if (!isAlreadyInDb) {
+        const { error: insertError } = await supabaseAdmin
+          .from('domains')
+          .insert({
+            domain,
+            label: '',
+            is_active: true,
+            is_default: false,
+            added_by: auth.user!.id,
+            note: 'Synced from Cloudflare',
+          });
 
-      if (insertError) {
-        if (insertError.code === '23505') {
-          errors.push(`${domain}: already exists`);
+        if (insertError) {
+          if (insertError.code === '23505') {
+            configLogs.push(`[${domain}] Domain đã tồn tại trong hệ thống.`);
+          } else {
+            errors.push(`${domain}: DB error - ${insertError.message}`);
+            continue;
+          }
         } else {
-          errors.push(`${domain}: DB error - ${insertError.message}`);
+          added.push(domain);
         }
-        continue;
+      } else {
+        configLogs.push(`[${domain}] Domain đã tồn tại trong DB, tiến hành kiểm tra/cập nhật cấu hình Cloudflare...`);
       }
-
-      added.push(domain);
 
       // 2. Automate Cloudflare Configuration (DNS, Email Routing, Worker Route)
       const zoneId = zoneInfo.id;
