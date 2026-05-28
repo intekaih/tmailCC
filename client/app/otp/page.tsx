@@ -33,6 +33,7 @@ export default function OTPPage() {
   const [twofaActive, setTwofaActive] = useState(false);
   const [copied2fa, setCopied2fa] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [show2faGuide, setShow2faGuide] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -477,13 +478,41 @@ export default function OTPPage() {
                       </svg>
                       Giải mã 2FA (Authenticator)
                     </span>
-                    <button 
-                      className={`mfa-toggle-btn ${twofaActive ? 'active' : ''}`}
-                      onClick={() => setTwofaActive(!twofaActive)}
-                      disabled={!twofaSecret.trim()}
-                    >
-                      {twofaActive ? 'Đang chạy' : 'Bật sinh mã'}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button 
+                        className={`mfa-toggle-btn ${twofaActive ? 'active' : ''}`}
+                        onClick={() => setTwofaActive(!twofaActive)}
+                        disabled={!twofaSecret.trim()}
+                      >
+                        {twofaActive ? 'Đang chạy' : 'Bật sinh mã'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShow2faGuide(true)}
+                        title="Hướng dẫn sử dụng 2FA"
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-muted)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          background: 'transparent',
+                          padding: 0
+                        }}
+                        className="hover-accent"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5"/>
+                          <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                          <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mfa-input-wrapper">
@@ -579,6 +608,141 @@ export default function OTPPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {show2faGuide && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 fade-in"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 200,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+            }}
+          >
+            <div 
+              className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl max-w-lg w-full p-6 shadow-2xl relative"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                maxWidth: '512px',
+                width: '100%',
+                padding: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                position: 'relative',
+              }}
+            >
+              <button 
+                onClick={() => setShow2faGuide(false)}
+                className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+
+              <h3 
+                className="text-lg font-bold text-[var(--accent)] mb-4 flex items-center gap-2"
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: 'var(--accent)',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5"/>
+                  <line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                </svg>
+                Hướng dẫn Giải mã 2FA
+              </h3>
+
+              <div 
+                className="text-sm text-[var(--text-secondary)] space-y-4 leading-relaxed"
+                style={{
+                  fontSize: '14px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.6',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                }}
+              >
+                <p>
+                  Chức năng <strong>Giải mã 2FA (Authenticator)</strong> trên trang <strong>/otp</strong> được xây dựng theo tiêu chuẩn quốc tế <strong>TOTP (RFC 6238)</strong> — đây chính là chuẩn chung mà Google Authenticator và Microsoft Authenticator đang sử dụng.
+                </p>
+                <p>
+                  Vì vậy, chức năng này hoàn toàn sử dụng được cho <strong>Spotify, Grok (X), Facebook, GitHub, Google, Discord, Microsoft...</strong> và hầu hết mọi dịch vụ trực tuyến hiện nay, chứ không chỉ giới hạn ở ChatGPT.
+                </p>
+                
+                <div 
+                  className="bg-[var(--bg-primary)] p-4 rounded-lg border border-[var(--border)]"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <h4 className="font-semibold text-[var(--text-primary)] mb-2" style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                    Cách sử dụng cho các dịch vụ khác:
+                  </h4>
+                  <ol className="list-decimal list-inside space-y-2 pl-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <li>
+                      Khi bạn bật bảo mật 2 lớp (2FA) trên các trang web như Spotify, Grok,... họ sẽ hiển thị một mã QR kèm theo một dòng mã chữ và số viết hoa gọi là <strong>Secret Key</strong> (Khóa bí mật hoặc Mã thiết lập thủ công).
+                    </li>
+                    <li>
+                      Bạn chỉ cần sao chép đoạn <strong>Secret Key</strong> đó và dán vào ô <strong>Giải mã 2FA (Authenticator)</strong> trên tmailCC.
+                    </li>
+                    <li>
+                      Hệ thống sẽ ngay lập tức sinh ra mã 6 chữ số tự động xoay vòng sau mỗi 30 giây, trùng khớp hoàn toàn với mã hiển thị trên ứng dụng Google Authenticator ở điện thoại của bạn.
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  onClick={() => setShow2faGuide(false)}
+                  className="btn btn-primary px-5 py-2 text-sm font-semibold"
+                  style={{
+                    padding: '8px 20px',
+                    fontSize: '14px',
+                    fontWeight: 'semibold',
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--accent)',
+                    color: 'var(--bg-primary)',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Đã hiểu
+                </button>
               </div>
             </div>
           </div>
