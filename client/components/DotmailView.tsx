@@ -18,13 +18,13 @@ export default function DotmailView({ account }: DotmailViewProps) {
   const [loading, setLoading] = useState(false);
   const [otpData, setOtpData] = useState<{ otp: string | null; from: string; subject: string } | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(15);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const loadingRef = useRef(loading);
   loadingRef.current = loading;
 
-  const fetchOtp = async () => {
+  const fetchOtp = async (isManual = true) => {
     setLoading(true);
     setHasSearched(true);
     try {
@@ -33,7 +33,7 @@ export default function DotmailView({ account }: DotmailViewProps) {
       setOtpData(data);
       if (data.otp) {
         toast('Đã tìm thấy mã OTP thành công!', 'success');
-      } else {
+      } else if (isManual) {
         toast('Không tìm thấy mã OTP mới nào. Vui lòng thử lại.', 'info');
       }
     } catch (err: any) {
@@ -64,11 +64,12 @@ export default function DotmailView({ account }: DotmailViewProps) {
     setOtpData(null);
     setHasSearched(false);
     setLoading(false);
-    setAutoRefresh(false);
+    setAutoRefresh(true);
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
+    fetchOtp(false);
   }, [account.address]);
 
   useEffect(() => {
@@ -151,7 +152,7 @@ export default function DotmailView({ account }: DotmailViewProps) {
           </div>
 
           <button
-            onClick={fetchOtp}
+            onClick={() => fetchOtp(true)}
             disabled={loading}
             className="btn btn-primary w-full justify-center py-2.5 text-sm font-semibold flex items-center gap-2"
           >
