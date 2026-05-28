@@ -304,6 +304,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Parent deleted' });
     }
 
+    // --- Update parent Gmail ---
+    if (action === 'update-parent') {
+      const { id, app_password } = body;
+      if (!id || !app_password) {
+        return NextResponse.json({ error: 'id and app_password are required' }, { status: 400 });
+      }
+
+      const { data, error } = await supabaseAdmin!
+        .from('gmail_parents')
+        .update({ app_password })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: 'Failed to update parent' }, { status: 500 });
+      }
+      return NextResponse.json({ parent: data });
+    }
+
+    // --- Check parent Gmail live status ---
+    if (action === 'check-parent') {
+      const { id } = body;
+      if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+      const { data: parent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('address, app_password')
+        .eq('id', id)
+        .single();
+
+      if (!parent) {
+        return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      }
+
+      const client = new ImapFlow({
+        host: 'imap.gmail.com',
+        port: 993,
+        secure: true,
+        auth: { user: parent.address, pass: parent.app_password },
+        logger: false,
+      });
+
+      try {
+        await client.connect();
+        await client.logout().catch(() => {});
+        return NextResponse.json({ success: true, message: 'Kết nối IMAP thành công! Tài khoản sẵn sàng.' });
+      } catch (err: any) {
+        return NextResponse.json({ success: false, error: err.message });
+      }
+    }
+
     // --- Generate single-dot dotmails ---
     if (action === 'generate') {
       const { parent_id } = body;

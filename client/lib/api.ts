@@ -424,6 +424,18 @@ export const api = {
       request<{ otp: string | null; from: string; subject: string }>(
         `/api/admin/dotmails?action=otp&address=${encodeURIComponent(address)}`
       ),
+
+    updateGmailParent: (id: string, app_password: string) =>
+      request<any>('/api/admin/dotmails', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'update-parent', id, app_password }),
+      }),
+
+    checkGmailParent: (id: string) =>
+      request<{ success: boolean; message?: string; error?: string }>('/api/admin/dotmails', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'check-parent', id }),
+      }),
   },
 
   health: () =>

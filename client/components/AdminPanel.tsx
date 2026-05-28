@@ -63,6 +63,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
   const [newGmailAppPassword, setNewGmailAppPassword] = useState('');
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
   const [dotmailGenerating, setDotmailGenerating] = useState(false);
+  const [checkingParentId, setCheckingParentId] = useState<string | null>(null);
+  const [editingParentId, setEditingParentId] = useState<string | null>(null);
+  const [editingAppPassword, setEditingAppPassword] = useState<string>('');
   const [selectedCfDomains, setSelectedCfDomains] = useState<string[]>([]);
 
   async function runConfirmAction() {
@@ -428,6 +431,38 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
         await loadDotmails();
       },
     });
+  }
+
+  async function handleCheckGmailParent(id: string) {
+    setCheckingParentId(id);
+    try {
+      const res = await api.admin.checkGmailParent(id);
+      if (res.success) {
+        toast('Tài khoản hoạt động tốt! Kết nối IMAP thành công.', 'success');
+      } else {
+        toast(`Lỗi kết nối: ${res.error}`, 'error');
+      }
+    } catch (err: any) {
+      toast(`Lỗi kiểm tra: ${err.message}`, 'error');
+    } finally {
+      setCheckingParentId(null);
+    }
+  }
+
+  async function handleUpdateParent(id: string) {
+    if (!editingAppPassword.trim()) return;
+    setLoading(true);
+    try {
+      await api.admin.updateGmailParent(id, editingAppPassword.trim());
+      toast('Đã cập nhật mật khẩu ứng dụng thành công', 'success');
+      setEditingParentId(null);
+      setEditingAppPassword('');
+      await loadDotmails();
+    } catch (err: any) {
+      toast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -1089,6 +1124,35 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            onClick={(e) => { e.stopPropagation(); handleCheckGmailParent(parent.id); }} 
+                            disabled={checkingParentId !== null} 
+                            title="Kiểm tra kết nối (Check Live)"
+                          >
+                            {checkingParentId === parent.id ? (
+                              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="32" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                              </svg>
+                            )}
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setEditingParentId(editingParentId === parent.id ? null : parent.id);
+                              setEditingAppPassword('');
+                            }} 
+                            title="Sửa mật khẩu ứng dụng"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
                           <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleGenerateDotmails(parent.id); }} disabled={dotmailGenerating} title="Sinh dotmail">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                           </button>
@@ -1098,6 +1162,37 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                       </div>
+
+                      {editingParentId === parent.id && (
+                        <div 
+                          style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            className="input"
+                            style={{ flex: 1, fontSize: 12.5, height: 32, padding: '4px 10px' }}
+                            placeholder="Nhập Mật khẩu ứng dụng mới (16 ký tự)"
+                            type="password"
+                            value={editingAppPassword}
+                            onChange={e => setEditingAppPassword(e.target.value)}
+                          />
+                          <button 
+                            className="btn btn-primary btn-sm" 
+                            style={{ height: 32, padding: '0 12px', fontSize: 12 }}
+                            onClick={() => handleUpdateParent(parent.id)}
+                            disabled={loading || !editingAppPassword.trim()}
+                          >
+                            Lưu
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ height: 32, padding: '0 12px', fontSize: 12 }}
+                            onClick={() => setEditingParentId(null)}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      )}
 
                       {isExpanded && dotmails.length > 0 && (
                         <div style={{ maxHeight: 300, overflowY: 'auto', padding: '8px 14px' }}>
