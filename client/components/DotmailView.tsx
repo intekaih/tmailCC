@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/lib/AppContext';
 
 interface DotmailViewProps {
@@ -18,6 +18,11 @@ export default function DotmailView({ account }: DotmailViewProps) {
   const [loading, setLoading] = useState(false);
   const [otpData, setOtpData] = useState<{ otp: string | null; from: string; subject: string } | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [countdown, setCountdown] = useState(15);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
 
   const fetchOtp = async () => {
     setLoading(true);
@@ -37,6 +42,61 @@ export default function DotmailView({ account }: DotmailViewProps) {
       setLoading(false);
     }
   };
+
+  const fetchOtpSilent = async () => {
+    if (loadingRef.current) return;
+    try {
+      const { api } = await import('@/lib/api');
+      const data = await api.admin.getDotmailOtp(account.address);
+      if (data.otp) {
+        setOtpData(data);
+        setHasSearched(true);
+        toast('Đã tự động tìm thấy mã OTP mới nhận!', 'success');
+        setAutoRefresh(false);
+      }
+    } catch (err) {
+      console.warn('Silent IMAP fetch error:', err);
+    }
+  };
+
+  useEffect(() => {
+    // Reset when selected account changes
+    setOtpData(null);
+    setHasSearched(false);
+    setLoading(false);
+    setAutoRefresh(false);
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, [account.address]);
+
+  useEffect(() => {
+    if (autoRefresh) {
+      setCountdown(15);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            fetchOtpSilent();
+            return 15;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    }
+
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [autoRefresh, account.address]);
 
   const handleCopyOtp = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -67,10 +127,28 @@ export default function DotmailView({ account }: DotmailViewProps) {
           )}
         </div>
 
-        <div className="border-t border-[var(--border)] pt-5">
-          <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
+        <div className="border-t border-[var(--border)] pt-5 flex flex-col gap-3">
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
             Hệ thống sẽ kết nối bảo mật qua giao thức IMAP tới Gmail gốc để tìm kiếm các thư mới nhận có chứa mã xác thực (OTP).
           </p>
+
+          <div className="flex items-center justify-between my-1">
+            <span className="text-xs text-[var(--text-secondary)] font-medium">Tự động quét (IMAP)</span>
+            <button
+              className={`relative flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold cursor-pointer transition-all duration-200
+                ${autoRefresh 
+                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20' 
+                  : 'bg-transparent text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--bg-hover)]'
+                }`}
+              onClick={() => setAutoRefresh(prev => !prev)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {autoRefresh ? `Tự động quét (${countdown}s)` : 'Tắt tự động quét'}
+            </button>
+          </div>
 
           <button
             onClick={fetchOtp}
