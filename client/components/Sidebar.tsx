@@ -126,6 +126,7 @@ export default function Sidebar({
   const [ownerFilter, setOwnerFilter] = useState('');
   const [guestLoading, setGuestLoading] = useState(false);
   const hasSetDefaultFilter = useRef(false);
+  const [dotmailAccounts, setDotmailAccounts] = useState<any[]>([]);
 
   // Set default filter for admin to show only their own accounts initially
   useEffect(() => {
@@ -134,6 +135,36 @@ export default function Sidebar({
       hasSetDefaultFilter.current = true;
     }
   }, [user, isAdmin]);
+
+  const loadDotmails = async () => {
+    if (!isAdmin) return;
+    try {
+      const { api } = await import('@/lib/api');
+      const res = await api.admin.dotmails();
+      const allDotmails = (res.parents || []).flatMap((parent: any) => {
+        return (parent.dotmails || []).map((dm: any) => ({
+          _id: dm.id,
+          id: dm.id,
+          address: dm.address,
+          domain: 'GMAIL DOTMAIL',
+          emailCount: 0,
+          isDotmail: true,
+          parentAddress: parent.address
+        }));
+      });
+      setDotmailAccounts(allDotmails);
+    } catch (err) {
+      console.warn('loadDotmails error:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadDotmails();
+    } else {
+      setDotmailAccounts([]);
+    }
+  }, [user, isAdmin, domainVersion, accounts.length]);
 
   const loadDomains = async () => {
     try {
@@ -283,12 +314,20 @@ export default function Sidebar({
     const ownerName = a.owner?.username || guestLabel;
     return ownerName === ownerFilter;
   });
-  const filteredAccountDomains = Array.from(new Set(filteredAccounts.map(a => a.domain)));
+  const normalDomains = Array.from(new Set(filteredAccounts.map(a => a.domain)));
+  const filteredAccountDomains = [...normalDomains];
+  if (dotmailAccounts.length > 0) {
+    filteredAccountDomains.push('GMAIL DOTMAIL');
+  }
 
   const accountsByDomain = filteredAccountDomains.reduce((acc, domain) => {
-    acc[domain] = filteredAccounts.filter(a => a.domain === domain);
+    if (domain === 'GMAIL DOTMAIL') {
+      acc[domain] = dotmailAccounts;
+    } else {
+      acc[domain] = filteredAccounts.filter(a => a.domain === domain);
+    }
     return acc;
-  }, {} as Record<string, Account[]>);
+  }, {} as Record<string, any[]>);
 
   async function handleGenerateOtpKey(address: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -495,9 +534,11 @@ export default function Sidebar({
                           }
                         }}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] 
-                                      flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                          {account.address[0].toUpperCase()}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold flex-shrink-0
+                                      ${account.isDotmail 
+                                        ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                                        : 'bg-[var(--accent-subtle)] text-[var(--accent)]'}`}>
+                          {account.isDotmail ? 'G' : account.address[0].toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
                           <div className="text-sm font-medium text-[var(--text-primary)] truncate">
@@ -505,7 +546,7 @@ export default function Sidebar({
                           </div>
                           <div className="flex items-center gap-2 w-full">
                             <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
-                              {account.emailCount} {t('emails')}
+                              {account.isDotmail ? 'Gmail (IMAP)' : `${account.emailCount} ${t('emails')}`}
                             </span>
                             {account.owner?.username && (
                               <span 
@@ -533,50 +574,54 @@ export default function Sidebar({
                                   </svg>
                                 )}
                               </button>
-                              <button
-                                className="w-6 h-6 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)] 
-                                           hover:text-[var(--accent)] transition-all duration-150 flex items-center justify-center"
-                                onClick={e => { e.stopPropagation(); onShowQR(account.address); }}
-                                title={t('showQRCode')}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="14" y="3" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="3" y="14" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="14" y="14" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="18" y="14" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="14" y="18" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
-                                  <rect x="18" y="18" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
-                                </svg>
-                              </button>
-                              <button
-                                className={`w-6 h-6 rounded transition-all duration-150 flex items-center justify-center
-                                  \${otpKeyGenerated === account.address 
-                                    ? 'text-[var(--success)]' 
-                                    : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]'}`}
-                                onClick={e => handleGenerateOtpKey(account.address, e)}
-                                title="Tạo OTP key"
-                              >
-                                {otpKeyGenerated === account.address ? (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                    <polyline points="20 6 9 17 4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                ) : (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                )}
-                              </button>
-                              <button
-                                className="w-6 h-6 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--error)] 
-                                           transition-all duration-150 flex items-center justify-center"
-                                onClick={e => handleDelete(account.address, e)}
-                                title={t('delete')}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              </button>
+                              {!account.isDotmail && (
+                                <>
+                                  <button
+                                    className="w-6 h-6 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)] 
+                                               hover:text-[var(--accent)] transition-all duration-150 flex items-center justify-center"
+                                    onClick={e => { e.stopPropagation(); onShowQR(account.address); }}
+                                    title={t('showQRCode')}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                      <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="14" y="3" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="3" y="14" width="7" height="7" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="14" y="14" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="18" y="14" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="14" y="18" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
+                                      <rect x="18" y="18" width="3" height="3" stroke="currentColor" strokeWidth="2"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className={`w-6 h-6 rounded transition-all duration-150 flex items-center justify-center
+                                      ${otpKeyGenerated === account.address 
+                                        ? 'text-[var(--success)]' 
+                                        : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]'}`}
+                                    onClick={e => handleGenerateOtpKey(account.address, e)}
+                                    title="Tạo OTP key"
+                                  >
+                                    {otpKeyGenerated === account.address ? (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                        <polyline points="20 6 9 17 4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    ) : (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <button
+                                    className="w-6 h-6 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--error)] 
+                                               transition-all duration-150 flex items-center justify-center"
+                                    onClick={e => handleDelete(account.address, e)}
+                                    title={t('delete')}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

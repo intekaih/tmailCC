@@ -419,6 +419,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ action: 'delete-dotmail', id }),
       }),
+
+    getDotmailOtp: (address: string) =>
+      request<{ otp: string | null; from: string; subject: string }>(
+        `/api/admin/dotmails?action=otp&address=${encodeURIComponent(address)}`
+      ),
   },
 
   health: () =>

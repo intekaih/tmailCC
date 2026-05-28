@@ -10,6 +10,7 @@ import DeveloperSettings from '@/components/DeveloperSettings';
 import Sidebar from '@/components/Sidebar';
 import EmailList from '@/components/EmailList';
 import EmailView from '@/components/EmailView';
+import DotmailView from '@/components/DotmailView';
 import QRModal from '@/components/QRModal';
 import NotificationSound from '@/components/NotificationSound';
 import AvatarUpload from '@/components/AvatarUpload';
@@ -458,6 +459,12 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   }
 
   async function loadEmails(account: Account) {
+    if ((account as any).isDotmail) {
+      setEmailsLoading(false);
+      setSelectedEmail(null);
+      setEmails([]);
+      return;
+    }
     setEmailsLoading(true);
     setSelectedEmail(null);
     seenEmailIds.current.clear();
@@ -649,11 +656,17 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
           onCopyAddress={handleCopyAddress} onShowQR={setShowQRModal}
           onRefresh={loadAccounts} loading={loading} totalUnread={totalUnread} domainVersion={domainVersion} />
 
-        <EmailList emails={emails} selectedEmail={selectedEmail} onSelectEmail={handleSelectEmail}
-          onRefresh={() => selectedAccount && loadEmails(selectedAccount)}
-          onClearAll={handleClearAllEmails} loading={emailsLoading} account={selectedAccount} />
+        {selectedAccount && (selectedAccount as any).isDotmail ? (
+          <DotmailView account={selectedAccount as any} />
+        ) : (
+          <>
+            <EmailList emails={emails} selectedEmail={selectedEmail} onSelectEmail={handleSelectEmail}
+              onRefresh={() => selectedAccount && loadEmails(selectedAccount)}
+              onClearAll={handleClearAllEmails} loading={emailsLoading} account={selectedAccount} />
 
-        <EmailView email={selectedEmail} onToggleStar={handleToggleStar} onDelete={handleDeleteEmail} />
+            <EmailView email={selectedEmail} onToggleStar={handleToggleStar} onDelete={handleDeleteEmail} />
+          </>
+        )}
 
         {/* TOPBAR */}
         <div className="topbar">
