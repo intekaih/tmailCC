@@ -176,7 +176,7 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
     }
   } catch (err: any) {
     console.error('[Dotmail OTP] IMAP error:', err.message);
-    return { otp: null, from: '', subject: '' };
+    throw err;
   } finally {
     await client.logout().catch(() => {});
   }
@@ -214,8 +214,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Parent Gmail not found for this dotmail' }, { status: 404 });
       }
 
-      const result = await fetchOTPFromGmail(parent.address, parent.app_password, address);
-      return NextResponse.json(result);
+      try {
+        const result = await fetchOTPFromGmail(parent.address, parent.app_password, address);
+        return NextResponse.json(result);
+      } catch (err: any) {
+        return NextResponse.json({ error: `Lỗi kết nối IMAP: ${err.message}` }, { status: 500 });
+      }
     }
 
     // --- Default: List all parents with nested dotmails ---
