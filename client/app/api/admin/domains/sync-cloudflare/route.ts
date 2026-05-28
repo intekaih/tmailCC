@@ -332,40 +332,41 @@ export async function POST(request: NextRequest) {
           configLogs.push(`[${domain}] Cảnh báo kiểm tra Email Routing: ${routeErr.message}. Vui lòng tự bật thủ công.`);
         }
 
-        // C. Tạo Email Routing Rule trỏ vào Cloudflare Worker 'tmail-worker'
-        configLogs.push(`[${domain}] Đang kiểm tra các Routing Rules...`);
-        const rulesResp = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules`, { headers });
-        if (!rulesResp.ok) {
-          throw new Error(`Không thể lấy danh sách Rules (HTTP ${rulesResp.status}).`);
+        // C. Cấu hình Catch-All Rule trỏ vào Cloudflare Worker 'tmail-worker'
+        configLogs.push(`[${domain}] Đang kiểm tra cấu hình Catch-All Rule...`);
+        const catchAllResp = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules/catch_all`, { headers });
+        
+        let shouldUpdateCatchAll = true;
+        if (catchAllResp.ok) {
+          const catchAllData = await catchAllResp.json() as any;
+          const currentCatchAll = catchAllData.result;
+          
+          if (currentCatchAll) {
+            const isWorkerAction = currentCatchAll.enabled && 
+              currentCatchAll.actions?.some((a: any) => a.type === 'worker' && a.value?.includes('tmail-worker'));
+            
+            if (isWorkerAction) {
+              shouldUpdateCatchAll = false;
+              configLogs.push(`[${domain}] Catch-All Rule trỏ tới tmail-worker đã được bật và cấu hình chính xác.`);
+            }
+          }
         }
-        const rulesData = await rulesResp.json() as any;
-        const currentRules = rulesData.result || [];
 
-        const hasWorkerRule = currentRules.some((rule: any) => 
-          rule.enabled && 
-          rule.matchers?.some((m: any) => m.type === 'all') &&
-          rule.actions?.some((a: any) => a.type === 'worker' && a.value?.includes('tmail-worker'))
-        );
-
-        if (!hasWorkerRule) {
-          configLogs.push(`[${domain}] Đang tạo Catch-All Rule trỏ tới tmail-worker...`);
-          const addRule = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules`, {
-            method: 'POST',
+        if (shouldUpdateCatchAll) {
+          configLogs.push(`[${domain}] Đang cập nhật Catch-All Rule trỏ tới tmail-worker...`);
+          const updateCatchAll = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules/catch_all`, {
+            method: 'PUT',
             headers,
             body: JSON.stringify({
-              name: 'TMail Catch-All to Worker',
               enabled: true,
-              matchers: [{ type: 'all' }],
               actions: [{ type: 'worker', value: ['tmail-worker'] }]
             })
           });
-          if (!addRule.ok) {
-            const ruleErr = await addRule.json().catch(() => ({}));
-            throw new Error(`Lỗi tạo Rule: ${ruleErr.errors?.[0]?.message || addRule.statusText}`);
+          if (!updateCatchAll.ok) {
+            const ruleErr = await updateCatchAll.json().catch(() => ({}));
+            throw new Error(`Lỗi cấu hình Catch-All: ${ruleErr.errors?.[0]?.message || updateCatchAll.statusText}`);
           }
-          configLogs.push(`[${domain}] Đã tạo Catch-All Rule thành công.`);
-        } else {
-          configLogs.push(`[${domain}] Catch-All Rule trỏ tới tmail-worker đã tồn tại.`);
+          configLogs.push(`[${domain}] Cấu hình Catch-All Rule trỏ tới tmail-worker thành công.`);
         }
 
         configLogs.push(`[${domain}] Hoàn tất cấu hình Cloudflare thành công!`);
