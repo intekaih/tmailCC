@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Account } from '@/lib/api';
+import { api, Account } from '@/lib/api';
 import { useApp } from '@/lib/AppContext';
 import AnimatedEmptyState from '@/components/AnimatedText';
 
@@ -46,48 +46,6 @@ export function removeGuestAccount(address: string) {
   if (typeof window === 'undefined') return;
   const accounts = getGuestAccounts().filter(a => a.address !== address);
   localStorage.setItem(LS_GUEST_ACCOUNTS, JSON.stringify(accounts));
-}
-
-// ============================================
-// API CALLS
-// ============================================
-async function apiCreateAccount(address: string): Promise<{ account: any; guestToken?: string }> {
-  const token = localStorage.getItem('tmail_token');
-  const res = await fetch('/api/accounts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      localPart: address.split('@')[0],
-      domain: address.split('@')[1],
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to create account');
-  return data;
-}
-
-async function apiGetAccount(address: string): Promise<any> {
-  const token = localStorage.getItem('tmail_token');
-  let guestToken = null;
-  try {
-    const tokens = JSON.parse(localStorage.getItem('tmail_guest_tokens') || '{}');
-    guestToken = tokens[address.toLowerCase()] || null;
-  } catch (err) {
-    // ignore
-  }
-
-  const res = await fetch(`/api/accounts/${encodeURIComponent(address)}`, {
-    headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      ...(guestToken ? { 'X-Guest-Token': guestToken } : {}),
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Account not found');
-  return data;
 }
 
 interface SidebarProps {
@@ -148,7 +106,6 @@ export default function Sidebar({
   const loadDotmails = async () => {
     if (!isAdmin) return;
     try {
-      const { api } = await import('@/lib/api');
       const res = await api.admin.dotmails();
       const allDotmails = (res.parents || []).flatMap((parent: any) => {
         return (parent.dotmails || []).map((dm: any) => ({
@@ -177,7 +134,6 @@ export default function Sidebar({
 
   const loadDomains = async () => {
     try {
-      const { api } = await import('@/lib/api');
       const res = await api.accounts.domains();
       const domainNames = res.domains.map((d: { domain: string }) => d.domain);
       setAvailableDomains(domainNames);
@@ -210,13 +166,16 @@ export default function Sidebar({
 
     for (const ga of guestAccounts) {
       try {
-        const accountData = await apiGetAccount(ga.address);
-        syncedAccounts.push(accountData.account);
+        const accountData = await api.accounts.get(ga.address);
+        if (accountData) syncedAccounts.push(accountData);
       } catch {
         // Account doesn't exist on server, try to recreate
         try {
-          const newAccount = await apiCreateAccount(ga.address);
-          syncedAccounts.push(newAccount.account);
+          const newAccount = await api.accounts.create({
+            localPart: ga.localPart,
+            domain: ga.domain,
+          });
+          if (newAccount) syncedAccounts.push(newAccount);
         } catch {
           // Account creation failed, remove from localStorage
           removeGuestAccount(ga.address);
@@ -528,7 +487,7 @@ export default function Sidebar({
                   <div className="px-2">
                     {accountsByDomain[domain]?.map(account => (
                       <div
-                        key={account._id}
+                        key={account?._id || account?.address || Math.random().toString()}
                         className={`
                           w-full flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer
                           transition-all duration-150 relative group

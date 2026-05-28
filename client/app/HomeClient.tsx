@@ -396,9 +396,11 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     setAccounts(syncedAccounts);
     if (syncedAccounts.length > 0) {
       const targetAddress = localStorage.getItem('tmail_select_account');
-      const targetAcc = syncedAccounts.find(a => a.address === targetAddress) || syncedAccounts[0];
-      setSelectedAccount(targetAcc);
-      loadEmails(targetAcc);
+      const targetAcc = (targetAddress ? syncedAccounts.find(a => a?.address === targetAddress) : null) || syncedAccounts[0];
+      if (targetAcc) {
+        setSelectedAccount(targetAcc);
+        loadEmails(targetAcc);
+      }
       localStorage.removeItem('tmail_select_account');
     }
     setLoading(false);
