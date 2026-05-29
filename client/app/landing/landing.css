@@ -1,0 +1,343 @@
+/* Minimalist Monochrome Landing Styles */
+
+:root {
+  --font-jp-display: var(--font-playfair-display), Georgia, serif;
+  --font-jp-heading: var(--font-playfair-display), Georgia, serif;
+  --font-jp-body: var(--font-source-serif), Georgia, serif;
+}
+
+html[data-theme="light"] {
+  --jp-navy: #FFFFFF;         /* Background is white */
+  --jp-indigo: #FFFFFF;
+  --jp-ocean: #F5F5F5;
+  --jp-sapphire: #FFFFFF;
+  --jp-foam: #000000;         /* Primary text is black */
+  --jp-foam-highlight: #000000;
+  --jp-cyan: #525252;         /* Muted text is dark gray */
+  --jp-rice-paper: #FFFFFF;
+  --jp-ink: #000000;
+  --jp-gold: #000000;         /* Black IS the accent */
+  --jp-gold-hover: #000000;
+  --jp-border-gold: #000000;
+  --bg-grid-color: rgba(0, 0, 0, 0.03);
+  
+  --glass-bg: #FFFFFF;
+  --glass-border: #000000;
+  --glass-shadow: none;
+}
+
+html[data-theme="dark"] {
+  --jp-navy: #000000;          /* Background is black */
+  --jp-indigo: #000000;
+  --jp-ocean: #0d0d0d;
+  --jp-sapphire: #000000;
+  --jp-foam: #ffffff;          /* Primary text is white */
+  --jp-foam-highlight: #ffffff;
+  --jp-cyan: #a3a3a3;          /* Muted text is light gray */
+  --jp-rice-paper: #000000;
+  --jp-ink: #ffffff;
+  --jp-gold: #F4ABB4;          /* Pink IS the accent */
+  --jp-gold-hover: #ffc2cc;
+  --jp-border-gold: #F4ABB4;
+  --bg-grid-color: rgba(244, 171, 180, 0.04);
+  
+  --glass-bg: #0d0d0d;
+  --glass-border: #F4ABB4;
+  --glass-shadow: none;
+}
+
+/* Base background textures */
+.bg-seigaiha {
+  /* Editorial Grid Pattern */
+  background-image:
+    linear-gradient(var(--bg-grid-color, rgba(0, 0, 0, 0.03)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid-color, rgba(0, 0, 0, 0.03)) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-color: var(--jp-navy);
+  position: relative;
+}
+
+.bg-seigaiha::before {
+  display: none;
+}
+
+/* Main Layout Styles */
+.landing-body {
+  font-family: var(--font-jp-body);
+  background-color: var(--jp-navy);
+  color: var(--jp-foam);
+  overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Glitch Heading Text Effect replaced with clean elegant editorial scale */
+.cyber-glitch {
+  font-family: var(--font-jp-display);
+  font-size: 7rem;
+  font-weight: 800;
+  line-height: 1.0;
+  text-transform: uppercase;
+  text-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .cyber-glitch {
+    font-size: 3.5rem;
+  }
+}
+
+/* Wave container containing monochrome horizontal lines */
+.wave-container {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  background: transparent;
+  border-bottom: 4px solid var(--glass-border);
+}
+
+.wave-layer {
+  display: none;
+}
+
+.wave-svg {
+  display: none;
+}
+
+/* Editorial layout cards */
+.jp-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 0px !important;
+  clip-path: none !important;
+  transition: all 100ms ease-out;
+  box-shadow: none;
+}
+
+.jp-card:hover {
+  background: var(--jp-ocean);
+  border-color: var(--jp-gold);
+}
+
+/* Clean Editorial buttons */
+.jp-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  font-family: var(--font-jp-heading);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 11px;
+  transition: all 100ms ease-out;
+  cursor: pointer;
+  z-index: 1;
+  overflow: hidden;
+  border: 2px solid var(--jp-gold);
+  background: transparent;
+  color: var(--jp-foam);
+  border-radius: 0px !important;
+  clip-path: none !important;
+  box-shadow: none;
+}
+
+.jp-btn::before {
+  display: none; /* No scaling sliders */
+}
+
+.jp-btn:hover {
+  background: var(--jp-gold);
+  color: var(--jp-navy);
+  border-color: var(--jp-gold);
+}
+
+.jp-btn-primary {
+  background: var(--jp-gold);
+  color: var(--jp-navy);
+  border-color: var(--jp-gold);
+}
+
+.jp-btn-primary:hover {
+  background: var(--jp-navy);
+  color: var(--jp-foam);
+  border-color: var(--jp-gold);
+}
+
+.jp-btn-secondary {
+  border-color: var(--jp-gold);
+  color: var(--jp-foam);
+}
+
+.jp-btn-secondary:hover {
+  background: var(--jp-gold);
+  color: var(--jp-navy);
+}
+
+/* Editorial badge */
+.jp-stamp {
+  font-family: var(--font-jp-heading);
+  border: 1px solid var(--jp-gold);
+  color: var(--jp-foam);
+  padding: 6px 12px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  background: var(--jp-navy);
+  font-weight: 700;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.jp-border-seigaiha {
+  height: 8px;
+  width: 100%;
+  background: var(--jp-gold);
+}
+
+/* API Console styling - clean mock print code */
+.api-console {
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  border-radius: 0px !important;
+  overflow: hidden;
+  box-shadow: none;
+  clip-path: none !important;
+}
+
+.api-console-header {
+  background: var(--jp-ocean);
+  border-bottom: 2px solid var(--glass-border);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.api-console-tab {
+  color: var(--jp-cyan);
+  font-family: var(--font-jp-heading);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 0px !important;
+  transition: all 0.1s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+  flex-grow: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.api-console-tab:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.api-console-tab.active {
+  color: var(--jp-foam);
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  font-weight: 700;
+}
+
+.api-console-body {
+  padding: 20px;
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--jp-foam);
+  overflow-x: auto;
+  background: var(--glass-bg);
+}
+
+.api-console-response {
+  border-top: 1px dashed var(--glass-border);
+  margin-top: 12px;
+  padding-top: 12px;
+  color: var(--jp-cyan);
+}
+
+/* Pricing plan cards styling */
+.plan-toggle-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  border-radius: 0px !important;
+  clip-path: none !important;
+  padding: 28px;
+  transition: all 100ms ease-out;
+  position: relative;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.plan-card:hover {
+  background: var(--glass-bg);
+  border-color: var(--jp-gold);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.plan-card.premium {
+  border: 3px solid var(--jp-gold);
+  background: var(--glass-bg);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+.plan-card.premium::after {
+  content: "RECOMMENDED";
+  position: absolute;
+  top: 24px;
+  right: -35px;
+  width: 140px;
+  text-align: center;
+  background: var(--jp-gold);
+  color: var(--jp-navy);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 0;
+  transform: rotate(45deg);
+  letter-spacing: 0.1em;
+}
+
+.plan-card .jp-btn {
+  margin-top: auto;
+}
+
+.plan-features-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--jp-cyan);
+}
+
+/* Drop cap for first paragraph */
+.drop-cap::first-letter {
+  font-family: var(--font-jp-display);
+  font-size: 3.5rem;
+  float: left;
+  line-height: 1;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--jp-gold);
+  background: var(--jp-ocean);
+  color: var(--jp-foam);
+  font-weight: bold;
+}

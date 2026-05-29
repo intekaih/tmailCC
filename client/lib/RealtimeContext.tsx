@@ -28,6 +28,7 @@ import {
   resetSeenEmailsTracker,
   broadcastToTabs,
   listenForTabMessages,
+  formatEmailFromRealtimeRow,
 } from '@/lib/realtime';
 import {
   showNotification,
@@ -113,11 +114,69 @@ export function RealtimeProvider({
     };
   }, []);
 
+  // =============================================
+  // PERSISTENT BROADCAST CHANNEL
+  // Uses a DEDICATED Supabase client (not the SSR singleton) so that
+  // login/logout/setSession() on the main client CANNOT disrupt this
+  // WebSocket connection. Broadcasts don't need auth.
+  // =============================================
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[RealtimeContext-Broadcast] Missing Supabase env vars');
+      return;
+    }
+
+    // Create a completely independent client just for broadcast
+    const { createClient: createDirectClient } = require('@supabase/supabase-js');
+    const broadcastClient = createDirectClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const broadcastChannel = broadcastClient.channel('email-notifications');
+
+    broadcastChannel.on('broadcast', { event: 'new-email' }, (payload: any) => {
+      const row = payload.payload;
+      if (!row?.account_id || !row?.id) return;
+
+      console.log('[RealtimeContext-Broadcast] New email received:', row.id, 'for account:', row.account_id);
+
+      const email = formatEmailFromRealtimeRow(row);
+
+      // Try exact account match first
+      const exactCallback = accountCallbacks.current.get(row.account_id);
+      if (exactCallback) {
+        exactCallback(email);
+      } else {
+        // No exact match - dispatch to ALL registered callbacks
+        // This handles admin users who subscribe with their own account ID
+        // but need to see emails for ALL accounts in the system
+        accountCallbacks.current.forEach((cb, registeredAccountId) => {
+          console.log('[RealtimeContext-Broadcast] Dispatching to registered account:', registeredAccountId);
+          cb(email);
+        });
+      }
+      // Also call provider-level callback
+      onNewEmailRef.current?.(email, row.account_id);
+    });
+
+    broadcastChannel.subscribe((status: string, err: any) => {
+      console.log('[RealtimeContext-Broadcast] Channel status:', status, err || '');
+      if (status === 'SUBSCRIBED') {
+        console.log('[RealtimeContext-Broadcast] ✅ Persistent broadcast channel ACTIVE (independent client)');
+      }
+    });
+
+    return () => {
+      console.log('[RealtimeContext-Broadcast] Cleaning up persistent broadcast channel');
+      broadcastClient.removeChannel(broadcastChannel);
+    };
+  }, []); // Empty deps = mount once, never recreate
+
   // Listen for seen email broadcasts from other tabs
   useEffect(() => {
     const unsubscribe = listenForTabMessages('email-seen', ({ emailId, accountId }: { emailId: string; accountId: string }) => {
-      // When another tab sees an email, mark it as seen in our tracker too
-      // This is handled by the global tracker in realtime.ts
       console.log('[RealtimeContext] Received email-seen broadcast from another tab:', emailId);
     });
 

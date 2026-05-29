@@ -862,72 +862,148 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             loadingData ? (
               <ConfigSkeleton />
             ) : (
-              <div className="config-form">
-                <div className="form-group">
-                  <label className="form-label">{t('emailsPerMinute')}</label>
-                  <input
-                    className="input"
-                    type="number"
-                    value={configForm.rateLimit?.emailsPerMinute ?? 5}
-                    onChange={e => setConfigForm((prev: any) => ({
-                      ...prev,
-                      rateLimit: { ...(prev.rateLimit || {}), emailsPerMinute: Number(e.target.value) }
-                    }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">{t('emailsPerDay')}</label>
-                  <input
-                    className="input"
-                    type="number"
-                    value={configForm.rateLimit?.emailsPerDay ?? 50}
-                    onChange={e => setConfigForm((prev: any) => ({
-                      ...prev,
-                      rateLimit: { ...(prev.rateLimit || {}), emailsPerDay: Number(e.target.value) }
-                    }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">{t('maxMailboxStorage')}</label>
-                  <input
-                    className="input"
-                    type="number"
-                    value={configForm.maxMailboxStorageMB ?? 50}
-                    onChange={e => setConfigForm((prev: any) => ({ ...prev, maxMailboxStorageMB: Number(e.target.value) }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">{t('maxEmailSize')}</label>
-                  <input
-                    className="input"
-                    type="number"
-                    value={configForm.maxEmailSizeMB ?? 25}
-                    onChange={e => setConfigForm((prev: any) => ({ ...prev, maxEmailSizeMB: Number(e.target.value) }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
+              <div className="flex flex-col lg:flex-row gap-6 items-start">
+                <div className="config-form flex-1 w-full max-w-[400px]">
+                  <div className="form-group">
+                    <label className="form-label">{t('emailsPerMinute')}</label>
                     <input
-                      type="checkbox"
-                      checked={configForm.captchaEnabled ?? false}
-                      onChange={e => setConfigForm((prev: any) => ({ ...prev, captchaEnabled: e.target.checked }))}
+                      className="input"
+                      type="number"
+                      value={configForm.rateLimit?.emailsPerMinute ?? 5}
+                      onChange={e => setConfigForm((prev: any) => ({
+                        ...prev,
+                        rateLimit: { ...(prev.rateLimit || {}), emailsPerMinute: Number(e.target.value) }
+                      }))}
                     />
-                    {t('enableCaptcha')}
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{t('emailsPerDay')}</label>
                     <input
-                      type="checkbox"
-                      checked={configForm.allowUserOtpKey ?? false}
-                      onChange={e => setConfigForm((prev: any) => ({ ...prev, allowUserOtpKey: e.target.checked }))}
+                      className="input"
+                      type="number"
+                      value={configForm.rateLimit?.emailsPerDay ?? 50}
+                      onChange={e => setConfigForm((prev: any) => ({
+                        ...prev,
+                        rateLimit: { ...(prev.rateLimit || {}), emailsPerDay: Number(e.target.value) }
+                      }))}
                     />
-                    Cho phép User tự tạo OTP Key
-                  </label>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{t('maxMailboxStorage')}</label>
+                    <input
+                      className="input"
+                      type="number"
+                      value={configForm.maxMailboxStorageMB ?? 50}
+                      onChange={e => setConfigForm((prev: any) => ({ ...prev, maxMailboxStorageMB: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{t('maxEmailSize')}</label>
+                    <input
+                      className="input"
+                      type="number"
+                      value={configForm.maxEmailSizeMB ?? 25}
+                      onChange={e => setConfigForm((prev: any) => ({ ...prev, maxEmailSizeMB: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={configForm.captchaEnabled ?? false}
+                        onChange={e => setConfigForm((prev: any) => ({ ...prev, captchaEnabled: e.target.checked }))}
+                      />
+                      {t('enableCaptcha')}
+                    </label>
+                  </div>
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={configForm.allowUserOtpKey ?? false}
+                        onChange={e => setConfigForm((prev: any) => ({ ...prev, allowUserOtpKey: e.target.checked }))}
+                      />
+                      Cho phép User tự tạo OTP Key
+                    </label>
+                  </div>
+                  <button className="btn btn-primary w-full justify-center" onClick={handleSaveConfig} disabled={loading}>
+                    {t('saveConfig')}
+                  </button>
                 </div>
-                <button className="btn btn-primary" onClick={handleSaveConfig} disabled={loading}>
-                  {t('saveConfig')}
-                </button>
+
+                {/* Hướng dẫn chi tiết các cấu hình */}
+                <div className="flex-1 w-full bg-[var(--bg-tertiary)] p-5 rounded-2xl border border-[var(--border)] flex flex-col gap-4 text-xs">
+                  <div className="text-sm font-semibold text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                      <line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <line x1="12" y1="8" x2="12.01" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    Tài liệu Cấu hình Hệ thống
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <div className="font-bold text-[var(--text-primary)] mb-1">
+                        1. Thư mỗi phút & Thư mỗi ngày
+                      </div>
+                      <div className="text-[var(--text-secondary)] leading-relaxed pl-3.5">
+                        Thiết lập giới hạn số lượng email tối đa một tài khoản được phép nhận trong 1 phút hoặc 24 giờ.
+                        <div className="text-[var(--text-muted)] mt-0.5">
+                          • Mục đích: Ngăn chặn các cuộc tấn công spam làm tràn bộ nhớ máy chủ (DOS/Flood).
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-[var(--text-primary)] mb-1">
+                        2. Dung lượng lưu trữ tối đa (MB)
+                      </div>
+                      <div className="text-[var(--text-secondary)] leading-relaxed pl-3.5">
+                        Tổng dung lượng đĩa tối đa cho phép của mỗi hòm thư tạm thời.
+                        <div className="text-[var(--text-muted)] mt-0.5">
+                          • Mục đích: Giới hạn dung lượng lưu trữ trên VPS đối với mỗi người dùng.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-[var(--text-primary)] mb-1">
+                        3. Kích thước thư tối đa (MB)
+                      </div>
+                      <div className="text-[var(--text-secondary)] leading-relaxed pl-3.5">
+                        Kích thước tệp tin lớn nhất cho mỗi email đơn lẻ gửi đến (bao gồm cả tệp đính kèm).
+                        <div className="text-[var(--text-muted)] mt-0.5">
+                          • Mục đích: Từ chối các tệp tin cực lớn để bảo vệ băng thông và tài nguyên hệ thống.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-[var(--text-primary)] mb-1">
+                        4. Bảo vệ CAPTCHA
+                      </div>
+                      <div className="text-[var(--text-secondary)] leading-relaxed pl-3.5">
+                        Yêu cầu người dùng giải mã CAPTCHA trước khi tạo các tài khoản khách (Guest Accounts) mới.
+                        <div className="text-[var(--text-muted)] mt-0.5">
+                          • Mục đích: Ngăn chặn robot, script tự động tạo hàng loạt hòm thư tạm thời để spam.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-[var(--text-primary)] mb-1">
+                        5. OTP Key dành cho User
+                      </div>
+                      <div className="text-[var(--text-secondary)] leading-relaxed pl-3.5">
+                        Cho phép tài khoản người dùng bình thường tự tạo API Key để tự động hóa việc lấy mã OTP từ các hòm thư bằng code/tool.
+                        <div className="text-[var(--text-muted)] mt-0.5">
+                          • Mục đích: Phục vụ mục đích lập trình, tự động lấy OTP qua API mà không cần dùng giao diện web.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )
           )}
@@ -1257,9 +1333,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
 
         <style jsx>{`
           .admin-panel {
-            background: linear-gradient(135deg, #0a1424 0%, #050a12 100%);
-            border: 1px solid rgba(197, 160, 89, 0.18);
-            border-radius: 20px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0px;
             width: 90vw;
             max-width: 900px;
             height: 650px;
@@ -1267,38 +1343,21 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 80px -10px rgba(0, 0, 0, 0.65), 0 0 40px rgba(197, 160, 89, 0.05);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
             position: relative;
-          }
-          .admin-panel::before {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 60px;
-            opacity: 0.03;
-            background-image: var(--wave-pattern);
-            background-size: 80px 40px;
-            pointer-events: none;
-            z-index: 0;
-          }
-          .admin-panel > * {
-            position: relative;
-            z-index: 1;
           }
           .modal-header {
             padding: 20px 24px;
             margin: 0;
-            border-bottom: 1px solid rgba(197, 160, 89, 0.12);
+            border-bottom: 2px solid var(--border);
           }
           .tab-bar {
             display: flex;
-            border-bottom: 1px solid rgba(197, 160, 89, 0.12);
+            border-bottom: 1px solid var(--border);
             padding: 0 24px;
             overflow-x: auto;
             flex-shrink: 0;
-            background: rgba(0, 0, 0, 0.25);
+            background: var(--bg-secondary);
             gap: 4px;
           }
           .tab-btn {
@@ -1311,7 +1370,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             color: var(--text-secondary);
             border-bottom: 2px solid transparent;
             margin-bottom: -1px;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.1s ease-out;
             white-space: nowrap;
             font-weight: 500;
           }
@@ -1320,9 +1379,8 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
           }
           .tab-btn.active {
             color: var(--accent) !important;
-            border-bottom-color: var(--accent) !important;
-            font-weight: 600;
-            text-shadow: 0 0 10px rgba(197, 160, 89, 0.25);
+            border-bottom: 2px solid var(--accent) !important;
+            font-weight: 700;
           }
           .tab-content {
             flex: 1;
@@ -1335,27 +1393,31 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             gap: 16px;
           }
           .stat-card {
-            background: linear-gradient(135deg, rgba(18, 29, 45, 0.6) 0%, rgba(10, 18, 28, 0.6) 100%);
-            border: 1px solid rgba(197, 160, 89, 0.12);
-            border-radius: 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 0px;
             padding: 24px 16px;
             text-align: center;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.1s ease-out;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
           }
           .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(197, 160, 89, 0.3);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(197, 160, 89, 0.05);
+            background: var(--bg-hover);
+            border-color: var(--border);
+          }
+          .stat-card:hover .stat-value {
+            color: var(--bg-primary);
+          }
+          .stat-card:hover .stat-label {
+            color: var(--bg-secondary);
           }
           .stat-value {
             font-size: 32px;
             font-weight: 700;
-            color: var(--accent);
-            font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
-            text-shadow: 0 0 20px rgba(197, 160, 89, 0.18);
+            color: var(--text-primary);
+            font-family: var(--font-display), Georgia, serif;
+            transition: color 0.1s ease-out;
           }
           .stat-label {
             font-size: 12.5px;
@@ -1363,6 +1425,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             margin-top: 6px;
             font-weight: 500;
             letter-spacing: 0.02em;
+            transition: color 0.1s ease-out;
           }
           .table-container {
             overflow-x: auto;
@@ -1375,7 +1438,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
           .data-table th {
             text-align: left;
             padding: 12px 14px;
-            border-bottom: 2px solid rgba(197, 160, 89, 0.15);
+            border-bottom: 2px solid var(--border);
             color: var(--text-secondary);
             font-weight: 600;
             font-size: 12px;
@@ -1384,25 +1447,26 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
           }
           .data-table td {
             padding: 12px 14px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border-light);
             color: var(--text-primary);
           }
           .data-table tr:hover td {
-            background: rgba(197, 160, 89, 0.03);
+            background: var(--bg-secondary);
           }
           .role-tag {
             display: inline-block;
             padding: 2px 8px;
-            border-radius: 4px;
+            border-radius: 0px;
             font-size: 11px;
             font-weight: 600;
+            border: 1px solid var(--border);
           }
           .role-tag.admin {
-            background: rgba(197, 160, 89, 0.15);
-            color: var(--accent);
+            background: var(--text-primary);
+            color: var(--bg-primary);
           }
           .role-tag.user {
-            background: var(--bg-tertiary);
+            background: var(--bg-secondary);
             color: var(--text-secondary);
           }
           .add-domain-form {
@@ -1434,9 +1498,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             align-items: center;
             justify-content: space-between;
             padding: 12px 16px;
-            background: var(--bg-tertiary);
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: 0px;
           }
           .domain-info {
             display: flex;
@@ -1454,9 +1518,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
           .status-dot {
             width: 8px;
             height: 8px;
-            border-radius: 50%;
+            border-radius: 0px;
           }
-          .status-dot.active { background: var(--success); }
+          .status-dot.active { background: var(--text-primary); }
           .status-dot.inactive { background: var(--text-muted); }
           .config-form {
             display: flex;
@@ -1471,16 +1535,16 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: none;
             padding: 16px;
           }
           .confirm-dialog {
             width: min(360px, 100%);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--bg-secondary);
-            box-shadow: 0 18px 48px var(--shadow);
+            border-radius: 0px;
+            background: var(--bg-primary);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
             padding: 16px;
           }
           .confirm-title {
@@ -1488,6 +1552,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             font-weight: 700;
             color: var(--text-primary);
             margin-bottom: 8px;
+            text-transform: uppercase;
           }
           .confirm-body {
             font-size: 13px;
@@ -1501,58 +1566,15 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             gap: 8px;
           }
           .danger {
-            background: var(--error);
-          }
-          :global(html[data-theme="light"]) .admin-panel {
-            background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
-            border: 1px solid rgba(28, 108, 161, 0.18);
-            box-shadow: 0 25px 80px -10px rgba(0, 0, 0, 0.15), 0 0 40px rgba(28, 108, 161, 0.02);
-          }
-          :global(html[data-theme="light"]) .modal-header {
-            border-bottom-color: rgba(28, 108, 161, 0.12);
-          }
-          :global(html[data-theme="light"]) .admin-panel::before {
-            opacity: 0.08;
-          }
-          :global(html[data-theme="light"]) .tab-bar {
-            border-bottom-color: rgba(28, 108, 161, 0.12);
-            background: rgba(0, 0, 0, 0.03);
-          }
-          :global(html[data-theme="light"]) .tab-btn.active {
-            text-shadow: 0 0 10px rgba(28, 108, 161, 0.15);
-          }
-          :global(html[data-theme="light"]) .stat-card {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(240, 244, 248, 0.8) 100%);
-            border-color: rgba(28, 108, 161, 0.12);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-          }
-          :global(html[data-theme="light"]) .stat-card:hover {
-            border-color: rgba(28, 108, 161, 0.3);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1), 0 0 20px rgba(28, 108, 161, 0.02);
-          }
-          :global(html[data-theme="light"]) .stat-value {
-            text-shadow: 0 0 20px rgba(28, 108, 161, 0.1);
-          }
-          :global(html[data-theme="light"]) .data-table th {
-            border-bottom-color: rgba(28, 108, 161, 0.15);
-          }
-          :global(html[data-theme="light"]) .data-table td {
-            border-bottom-color: rgba(28, 108, 161, 0.05);
-          }
-          :global(html[data-theme="light"]) .data-table tr:hover td {
-            background: rgba(28, 108, 161, 0.03);
-          }
-          :global(html[data-theme="light"]) .role-tag.admin {
-            background: rgba(28, 108, 161, 0.1);
+            background: var(--text-primary);
+            color: var(--bg-primary);
           }
           .cloudflare-guide-card {
             margin-top: 24px;
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 0px;
             padding: 16px 20px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
           }
           .guide-header {
             display: flex;
@@ -1560,13 +1582,13 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             gap: 10px;
             font-size: 14px;
             font-weight: 700;
-            color: var(--accent);
+            color: var(--text-primary);
             margin-bottom: 12px;
             text-transform: uppercase;
             letter-spacing: 0.03em;
           }
           .guide-icon {
-            color: var(--accent);
+            color: var(--text-primary);
           }
           .guide-desc {
             font-size: 12.5px;
@@ -1590,10 +1612,10 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             justify-content: center;
             width: 22px;
             height: 22px;
-            border-radius: 50%;
-            background: var(--accent-subtle);
-            border: 1px solid var(--accent);
-            color: var(--accent);
+            border-radius: 0px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             font-size: 11px;
             font-weight: 700;
             flex-shrink: 0;
@@ -1613,49 +1635,44 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             margin-top: 6px;
             background: var(--bg-primary);
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 0px;
             border: 1px solid var(--border);
             font-size: 11.5px;
           }
           .dns-badge {
-            background: var(--accent-subtle);
-            border: 1px solid var(--accent);
-            color: var(--accent);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             font-weight: 700;
             font-size: 9.5px;
             padding: 1px 6px;
-            border-radius: 4px;
+            border-radius: 0px;
             text-transform: uppercase;
           }
           .dns-badge.mx {
-            background: rgba(76, 163, 116, 0.12);
-            border-color: var(--success);
-            color: var(--success);
+            background: var(--bg-secondary);
+            border-color: var(--border);
+            color: var(--text-primary);
           }
           .dns-badge.txt {
-            background: rgba(148, 163, 184, 0.12);
-            border-color: var(--text-muted);
+            background: var(--bg-secondary);
+            border-color: var(--border-light);
             color: var(--text-secondary);
           }
-          :global(html[data-theme="light"]) .cloudflare-guide-card {
-            background: rgba(0, 0, 0, 0.01);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-          }
           .cf-sync-btn {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.08) 100%);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            color: #f59e0b;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             font-weight: 600;
             display: flex;
             align-items: center;
             gap: 6px;
-            transition: all 0.25s ease;
+            transition: all 0.1s ease-out;
             white-space: nowrap;
           }
           .cf-sync-btn:hover:not(:disabled) {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.15) 100%);
-            border-color: rgba(245, 158, 11, 0.5);
-            box-shadow: 0 0 20px rgba(245, 158, 11, 0.12);
+            background: var(--bg-hover);
+            color: var(--bg-primary);
           }
           .cf-sync-btn:disabled {
             opacity: 0.6;
@@ -1671,9 +1688,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
           .cf-sync-result {
             margin-top: 12px;
             padding: 14px 16px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%);
-            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 0px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
             font-size: 12.5px;
           }
           .cf-sync-header {
@@ -1681,11 +1698,11 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             align-items: center;
             gap: 8px;
             font-weight: 600;
-            color: #10b981;
+            color: var(--text-primary);
             margin-bottom: 8px;
           }
           .cf-sync-added {
-            color: #10b981;
+            color: var(--text-primary);
             margin-top: 4px;
           }
           .cf-sync-info {
@@ -1701,14 +1718,14 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             margin-top: 14px;
             margin-bottom: 14px;
             padding: 16px;
-            background: rgba(245, 158, 11, 0.03);
-            border: 1px solid rgba(245, 158, 11, 0.2);
-            border-radius: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0px;
           }
           .cf-domains-title {
             font-size: 13.5px;
             font-weight: 700;
-            color: #f59e0b;
+            color: var(--text-primary);
             margin-bottom: 12px;
           }
           .cf-domains-grid {
@@ -1725,9 +1742,9 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             align-items: center;
             justify-content: space-between;
             padding: 8px 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 0px;
             font-size: 13px;
           }
           .cf-domain-check {
@@ -1746,13 +1763,14 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             font-size: 11px;
             font-weight: 600;
             padding: 1px 6px;
-            border-radius: 4px;
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
+            border-radius: 0px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            color: var(--text-secondary);
           }
           .cf-domain-status.synced {
-            background: rgba(99, 102, 241, 0.15);
-            color: var(--accent);
+            background: var(--text-primary);
+            color: var(--bg-primary);
           }
           .cf-actions-row {
             display: flex;
@@ -1760,7 +1778,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 12px;
-            border-top: 1px solid rgba(245, 158, 11, 0.15);
+            border-top: 1px solid var(--border);
             padding-top: 12px;
             margin-top: 12px;
           }
@@ -1810,7 +1828,7 @@ export default function AdminPanel({ onClose, onDomainsChanged }: AdminPanelProp
                     <br />
                     Truy cập vào trang cấu hình bảo mật tài khoản Google của bạn và kích hoạt xác minh 2 lớp:
                     <br />
-                    👉 <a href="https://myaccount.google.com/signinoption/two-step-verification" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Kích hoạt xác minh 2 lớp</a>
+                    👉 <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Kích hoạt xác minh 2 lớp</a>
                   </div>
                 </div>
 

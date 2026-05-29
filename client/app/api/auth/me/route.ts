@@ -44,6 +44,19 @@ export async function GET(request: NextRequest) {
 
     const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(decoded.sub as string);
 
+    const supabaseAccessToken = jwt.sign(
+      {
+        aud: 'authenticated',
+        role: 'authenticated',
+        sub: decoded.sub,
+        email: decoded.email || authUser?.user?.email || '',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { username: profile.username },
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
+      },
+      JWT_SECRET
+    );
+
     return NextResponse.json({
       user: {
         id: decoded.sub,
@@ -54,6 +67,7 @@ export async function GET(request: NextRequest) {
         emailCount: profile.email_count,
         preferences: profile.preferences,
       },
+      supabase_access_token: supabaseAccessToken,
     });
   } catch (err) {
     console.error('[Auth] /me error:', err);

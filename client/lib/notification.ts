@@ -7,39 +7,37 @@
 let cachedPermission: NotificationPermission | null = null;
 let swRegistration: ServiceWorkerRegistration | null = null;
 
-// Register Service Worker for notification actions
+// Register Service Worker for notification actions immediately (load event might have already fired in React/Next.js)
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => {
-        console.log('[Notification] Service Worker registered:', reg);
-        swRegistration = reg;
-        
-        // Listen for messages from Service Worker (e.g. copy code)
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'tmail:copy-code') {
-            const code = event.data.code;
-            navigator.clipboard.writeText(code)
-              .then(() => {
-                // Dispatch event to show a toast
-                window.dispatchEvent(new CustomEvent('tmail:show-toast', {
-                  detail: { message: `Đã sao chép mã xác thực: ${code}`, type: 'success' }
-                }));
-              })
-              .catch(err => {
-                console.error('[Notification] Failed to copy code:', err);
-              });
-          } else if (event.data && event.data.type === 'tmail:focus-email') {
-            window.dispatchEvent(new CustomEvent('tmail:focus-email', {
-              detail: { emailId: event.data.emailId }
-            }));
-          }
-        });
-      })
-      .catch(err => {
-        console.error('[Notification] SW registration failed:', err);
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => {
+      console.log('[Notification] Service Worker registered:', reg);
+      swRegistration = reg;
+      
+      // Listen for messages from Service Worker (e.g. copy code)
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'tmail:copy-code') {
+          const code = event.data.code;
+          navigator.clipboard.writeText(code)
+            .then(() => {
+              // Dispatch event to show a toast
+              window.dispatchEvent(new CustomEvent('tmail:show-toast', {
+                detail: { message: `Đã sao chép mã xác thực: ${code}`, type: 'success' }
+              }));
+            })
+            .catch(err => {
+              console.error('[Notification] Failed to copy code:', err);
+            });
+        } else if (event.data && event.data.type === 'tmail:focus-email') {
+          window.dispatchEvent(new CustomEvent('tmail:focus-email', {
+            detail: { emailId: event.data.emailId }
+          }));
+        }
       });
-  });
+    })
+    .catch(err => {
+      console.error('[Notification] SW registration failed:', err);
+    });
 }
 
 /**
@@ -176,8 +174,8 @@ export function showNotification(
     ];
   }
 
-  // Use Service Worker if registered to support actions
-  if (swRegistration) {
+  // Use Service Worker if registered AND active to support actions
+  if (swRegistration && swRegistration.active) {
     swRegistration.showNotification(title, notificationOptions)
       .catch(err => {
         console.error('[Notification] Service Worker showNotification failed, falling back:', err);

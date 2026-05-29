@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // Find user by username
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('id, username, role, is_active')
+      .select('id, username, role, is_active, avatar_url')
       .eq('username', username.toLowerCase())
       .maybeSingle();
 
@@ -105,8 +105,10 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({
-      user: { id: profile.id, username: profile.username, email: authUser.user.email, role: profile.role },
+      user: { id: profile.id, username: profile.username, email: authUser.user.email, role: profile.role, avatarUrl: profile.avatar_url || null },
       token,
+      supabase_access_token: authData.access_token,
+      supabase_refresh_token: authData.refresh_token,
     });
   } catch (err) {
     console.error('[Auth] Login error:', err);
@@ -140,7 +142,7 @@ async function handleSupabaseTokenLogin(supabase_access_token: string, supabase_
 
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('username, role, is_active')
+      .select('username, role, is_active, avatar_url')
       .eq('id', supabase_user_id)
       .maybeSingle();
 
@@ -164,8 +166,9 @@ async function handleSupabaseTokenLogin(supabase_access_token: string, supabase_
     );
 
     return NextResponse.json({
-      user: { id: supabase_user_id, username: profile.username, email: authUser.user.email, role: profile.role },
+      user: { id: supabase_user_id, username: profile.username, email: authUser.user.email, role: profile.role, avatarUrl: profile.avatar_url || null },
       token,
+      supabase_access_token,
     });
   } catch (err) {
     console.error('[Auth] Supabase token login error:', err);

@@ -382,7 +382,92 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 
 ---
 
-## 9. Lưu Ý Bảo Mật
+### Cập nhật App Password Gmail gốc
+
+```bash
+curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "update-parent", "id": "PARENT_UUID", "app_password": "new_app_password"}'
+```
+
+---
+
+### Kiểm tra kết nối Gmail gốc (IMAP)
+
+```bash
+curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "check-parent", "id": "PARENT_UUID"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Kết nối IMAP thành công! Tài khoản sẵn sàng."
+}
+```
+
+---
+
+## 9. Domain Management API (Admin)
+
+> **Lưu ý:** Các endpoint này yêu cầu quyền Admin (Bearer token của admin user).
+
+### Xem danh sách Domain (Admin)
+
+```bash
+curl https://tmailcc.kaih.co.uk/api/admin/domains \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "domains": [
+    {
+      "id": "uuid",
+      "domain": "kaih.co.uk",
+      "label": "Primary",
+      "isActive": true,
+      "isDefault": true,
+      "note": "Default domain",
+      "createdAt": "2026-05-23T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### Thêm Domain mới (Admin)
+
+```bash
+curl -X POST https://tmailcc.kaih.co.uk/api/admin/domains \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "newdomain.com",
+    "label": "Optional Label",
+    "isDefault": false,
+    "note": "Optional note"
+  }'
+```
+
+---
+
+### Xóa Domain (Admin)
+
+```bash
+curl -X DELETE https://tmailcc.kaih.co.uk/api/admin/domain/DOMAIN_UUID \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+---
+
+## 10. Lưu Ý Bảo Mật
 
 - Không commit API key vào code
 - Dùng environment variables

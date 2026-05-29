@@ -14,6 +14,7 @@ interface EmailItem {
 
 export default function OTPPage() {
   const [credential, setCredential] = useState('');
+  const [inputTwofaSecret, setInputTwofaSecret] = useState('');
   const [verified, setVerified] = useState(false);
   const [address, setAddress] = useState('');
   const [emails, setEmails] = useState<EmailItem[]>([]);
@@ -69,6 +70,7 @@ export default function OTPPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     let trimmed = credential.trim();
+    let optSecret = inputTwofaSecret.trim();
     
     // Extract clean email|key credential from text
     const cleanRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\|([a-fA-F0-9]{32})(?:\|([a-zA-Z0-9]{16,64}))?/i;
@@ -78,22 +80,29 @@ export default function OTPPage() {
       const key = match[2];
       const twofa = match[3];
       trimmed = twofa ? `${email}|${key}|${twofa}` : `${email}|${key}`;
-      setCredential(trimmed);
+    }
+
+    // Append separate 2FA Secret if provided separately and not already in main credential
+    const parts = trimmed.split('|');
+    if (parts.length < 3 && optSecret) {
+      trimmed = `${trimmed}|${optSecret}`;
     }
 
     if (!trimmed || !trimmed.includes('|')) {
-      setError('Nhập đúng định dạng: email|key hoặc email|key|2fa_secret');
+      setError('Nhập đúng định dạng: email|key hoặc nhập riêng 2FA Secret');
       return;
     }
+    
+    setCredential(trimmed);
     
     setLoading(true);
     setError('');
     credentialRef.current = trimmed;
 
     // Extract 2FA secret if present
-    const parts = trimmed.split('|');
-    if (parts.length >= 3) {
-      const secret = parts[2].trim();
+    const updatedParts = trimmed.split('|');
+    if (updatedParts.length >= 3) {
+      const secret = updatedParts[2].trim();
       if (secret) {
         setTwofaSecret(secret);
         setTwofaActive(true);
@@ -115,6 +124,7 @@ export default function OTPPage() {
   function handleLogout() {
     setVerified(false);
     setCredential('');
+    setInputTwofaSecret('');
     setAddress('');
     setEmails([]);
     setLatestCode(null);
@@ -300,45 +310,158 @@ export default function OTPPage() {
         </div>
 
         {!verified ? (
-          /* Login Form */
-          <form className="otp-form fade-in" onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                Mã truy cập
-              </label>
-              <input
-                type="text"
-                placeholder="email@domain.com|accesskey hoặc email@domain.com|accesskey|2fa_secret"
-                value={credential}
-                onChange={e => {
-                  setCredential(e.target.value);
-                  setError('');
-                }}
-                autoFocus
-                spellCheck={false}
-              />
-              <span className="input-hint">Định dạng: email|key hoặc email|key|2fa_secret</span>
-            </div>
+          /* Login Form & Standalone 2FA Split */
+          <div className="otp-columns-login">
+            {/* Card 1: Mailbox Access */}
+            <form className="otp-form fade-in" onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  Truy cập hộp thư (Email | Key)
+                </label>
+                <input
+                  type="text"
+                  placeholder="email@domain.com|accesskey"
+                  value={credential}
+                  onChange={e => {
+                    setCredential(e.target.value);
+                    setError('');
+                  }}
+                  autoFocus
+                  spellCheck={false}
+                />
+                <span className="input-hint">Định dạng: email|key (hoặc dán cả chuỗi kèm 2FA)</span>
+              </div>
 
-            {error && <div className="form-error-otp">{error}</div>}
+              {error && <div className="form-error-otp">{error}</div>}
 
-            <button type="submit" className="submit-btn" disabled={loading || !credential.trim()}>
-              {loading ? (
-                <span className="spinner" />
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="10 17 15 12 10 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
+              <button type="submit" className="submit-btn" disabled={loading || !credential.trim()}>
+                {loading ? (
+                  <span className="spinner" />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="10 17 15 12 10 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                )}
+                Truy cập hộp thư
+              </button>
+            </form>
+
+            {/* Card 2: Standalone 2FA Authenticator */}
+            <div className="otp-form fade-in mfa-card">
+              <div className="input-group">
+                <label>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  Giải mã 2FA (Authenticator)
+                </label>
+                <div className="mfa-input-wrapper">
+                  <input
+                    type="text"
+                    className="mfa-input"
+                    placeholder="Dán mã 2FA Secret Key tại đây..."
+                    value={inputTwofaSecret}
+                    onChange={e => {
+                      setInputTwofaSecret(e.target.value);
+                      if (e.target.value.trim()) {
+                        setTwofaSecret(e.target.value);
+                        setTwofaActive(true);
+                      } else {
+                        setTwofaSecret('');
+                        setTwofaActive(false);
+                      }
+                    }}
+                    spellCheck={false}
+                  />
+                  <button 
+                    type="button"
+                    className="mfa-paste-btn"
+                    onClick={async () => {
+                      try {
+                        if (!navigator.clipboard || !navigator.clipboard.readText) {
+                          throw new Error("Clipboard API not supported");
+                        }
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                          setInputTwofaSecret(text);
+                          setTwofaSecret(text);
+                          setTwofaActive(true);
+                          setTwofaError("");
+                        }
+                      } catch (err) {
+                        console.error("Failed to read clipboard:", err);
+                        setTwofaError("Hãy nhấn Ctrl+V để dán mã 2FA.");
+                        setTimeout(() => setTwofaError(""), 5000);
+                      }
+                    }}
+                    title="Dán từ Clipboard"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                    </svg>
+                  </button>
+                </div>
+                <span className="input-hint">Tự sinh OTP 6 số cho Spotify, Grok, Facebook...</span>
+              </div>
+
+              {twofaError && <div className="form-error-otp" style={{ marginTop: '10px' }}>{twofaError}</div>}
+
+              {inputTwofaSecret.trim() && !twofaError && (
+                <div className="mfa-display-area" style={{ marginTop: '8px' }}>
+                  <div className="code-display" style={{ marginTop: '6px' }}>
+                    <span className="code-value" style={{ fontSize: '28px', letterSpacing: '4px' }}>{twofaOtp}</span>
+                    {twofaOtp !== '------' && (
+                      <button
+                        className={`copy-btn ${copied2fa ? 'copied' : ''}`}
+                        onClick={() => {
+                          const rawOtp = twofaOtp.replace(/\s/g, '');
+                          navigator.clipboard?.writeText(rawOtp).then(() => {
+                            setCopied2fa(true);
+                            setTimeout(() => setCopied2fa(false), 2000);
+                          });
+                        }}
+                        title="Copy mã 2FA"
+                        style={{ width: '34px', height: '34px' }}
+                      >
+                        {copied2fa ? (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                            <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {twofaRemaining > 0 && (
+                    <div className="mfa-progress-row" style={{ marginTop: '2px' }}>
+                      <span className="mfa-timer-text">Xoay vòng sau {twofaRemaining} giây</span>
+                      <div className="mfa-progress-track">
+                        <div 
+                          className="mfa-progress-bar" 
+                          style={{ 
+                            width: `${(twofaRemaining / 30) * 100}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
-              Truy cập
-            </button>
-          </form>
+            </div>
+          </div>
         ) : (
           /* Verified — show codes & emails */
           <div className="verified-section fade-in">
@@ -350,6 +473,27 @@ export default function OTPPage() {
                   <path d="M2 7L12 13L22 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 <span className="account-addr">{address}</span>
+                <button 
+                  className={`copy-addr-btn ${copied === 'address' ? 'copied' : ''}`}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(address).then(() => {
+                      setCopied("address");
+                      setTimeout(() => setCopied(null), 2000);
+                    });
+                  }}
+                  title="Sao chép địa chỉ email"
+                >
+                  {copied === 'address' ? (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                      <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.8"/>
+                    </svg>
+                  )}
+                </button>
                 <span className="live-badge">
                   <span className="pulse-dot" />
                   Live
@@ -751,10 +895,10 @@ export default function OTPPage() {
       <style jsx>{`
         .otp-container {
           transition: max-width 0.3s ease;
-          max-width: 460px;
+          max-width: 1100px;
         }
         .otp-container.verified-wide {
-          max-width: 900px;
+          max-width: 1100px;
         }
         .otp-columns {
           display: grid;
@@ -936,7 +1080,32 @@ export default function OTPPage() {
           font-family: var(--font-body), sans-serif;
           position: relative;
         }
-        .otp-container { width: 100%; max-width: 460px; z-index: 10; }
+        .otp-container { width: 100%; max-width: 1100px; z-index: 10; transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .otp-columns-login {
+          display: grid;
+          grid-template-columns: 1.05fr 0.95fr;
+          gap: 20px;
+          width: 100%;
+          align-items: start;
+        }
+        @media (max-width: 680px) {
+          .otp-columns-login {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+        }
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 16px;
+          width: 100%;
+        }
+        @media (max-width: 600px) {
+          .form-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+        }
         .otp-header { text-align: center; margin-bottom: 28px; }
         .otp-logo {
           display: flex; align-items: center; justify-content: center;
@@ -949,7 +1118,7 @@ export default function OTPPage() {
         .otp-form {
           background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px;
           padding: 24px; display: flex; flex-direction: column; gap: 16px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          box-shadow: none;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
         }
@@ -994,6 +1163,29 @@ export default function OTPPage() {
           font-size: 13px; font-family: 'JetBrains Mono', monospace;
           color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis;
         }
+        .copy-addr-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border);
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+          width: 22px;
+          height: 22px;
+        }
+        .copy-addr-btn:hover {
+          color: var(--accent);
+          background: rgba(255, 255, 255, 0.08);
+          border-color: var(--accent);
+        }
+        .copy-addr-btn.copied {
+          color: var(--success);
+          border-color: var(--success);
+        }
         .live-badge {
           display: flex; align-items: center; gap: 4px;
           font-size: 10px; font-weight: 700; color: var(--success); text-transform: uppercase;
@@ -1013,7 +1205,7 @@ export default function OTPPage() {
         /* Code Card */
         .code-card {
           background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px; padding: 18px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          box-shadow: none;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
         }

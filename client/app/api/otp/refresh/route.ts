@@ -17,6 +17,12 @@ try {
   // imapflow/mailparser not available in this environment
 }
 
+function normalizeDotmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@');
+  if (!domain) return email;
+  return `${local.replace(/\./g, '')}@${domain}`;
+}
+
 function hashAccessKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
@@ -231,8 +237,16 @@ export async function POST(request: NextRequest) {
               };
 
               const targetEmail = addressLower;
+              const cleanParent = parent.address.toLowerCase().trim();
               const recipientEmails = [...extractEmails(toText), ...extractEmails(ccText)];
-              const isTargetDotmail = recipientEmails.includes(targetEmail);
+              
+              let isTargetDotmail = false;
+              if (targetEmail === cleanParent) {
+                const normalizedTarget = normalizeDotmail(targetEmail);
+                isTargetDotmail = recipientEmails.some(rec => normalizeDotmail(rec) === normalizedTarget);
+              } else {
+                isTargetDotmail = recipientEmails.includes(targetEmail);
+              }
 
               if (!isTargetDotmail) continue;
 

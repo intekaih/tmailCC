@@ -1,9 +1,9 @@
 /**
  * tmailCC API Client - Next.js Backend Compatible
- * 
- * All API calls go to local Next.js API routes (same origin)
  * No CORS needed - same origin policy applies
  */
+
+import { createClient } from './supabase/client';
 
 export interface User {
   id: string;
@@ -193,25 +193,49 @@ export const api = {
   // ==========================================
   auth: {
     login: (data: { username: string; password: string }) =>
-      request<{ user: User; token: string }>('/api/auth/login', {
+      request<{ user: User; token: string; supabase_access_token?: string; supabase_refresh_token?: string }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
-      }).then(res => {
+      }).then(async res => {
         setToken(res.token);
+        if (typeof window !== 'undefined' && res.supabase_access_token) {
+          try {
+            const supabase = createClient();
+            await supabase.auth.setSession({
+              access_token: res.supabase_access_token,
+              refresh_token: res.supabase_refresh_token || '',
+            });
+            console.log('[API] Supabase authenticated session established.');
+          } catch (err) {
+            console.error('[API] Failed to set supabase session:', err);
+          }
+        }
         return res;
       }),
 
     loginWithSupabaseToken: (data: { supabase_access_token: string; supabase_user_id: string }) =>
-      request<{ user: User; token: string }>('/api/auth/login', {
+      request<{ user: User; token: string; supabase_access_token?: string }>('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).then(res => {
+      }).then(async res => {
         setToken(res.token);
+        if (typeof window !== 'undefined' && res.supabase_access_token) {
+          try {
+            const supabase = createClient();
+            await supabase.auth.setSession({
+              access_token: res.supabase_access_token,
+              refresh_token: '',
+            });
+            console.log('[API] Supabase authenticated session established.');
+          } catch (err) {
+            console.error('[API] Failed to create supabase client:', err);
+          }
+        }
         return res;
       }),
 
-    me: () => request<{ user: User }>('/api/auth/me'),
+    me: () => request<{ user: User; supabase_access_token?: string }>('/api/auth/me'),
 
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
       request<{ message: string }>('/api/auth/change-password', {
@@ -228,7 +252,7 @@ export const api = {
   // ACCOUNTS
   // ==========================================
   accounts: {
-    create: (data: { localPart?: string; domain: string }) =>
+    create: (data: { localPart?: string; domain: string; captchaToken?: string }) =>
       request<Account>('/api/accounts', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -446,7 +470,7 @@ export const api = {
       }),
 
     getDotmailOtp: (address: string) =>
-      request<{ otp: string | null; from: string; subject: string }>(
+      request<{ emails: any[] }>(
         `/api/admin/dotmails?action=otp&address=${encodeURIComponent(address)}`
       ),
 
@@ -505,6 +529,7 @@ export const api = {
       apiCalls: { today: number; thisMonth: number };
       webhookDeliveries: { today: number; thisMonth: number };
       accounts: { total: number };
+      emails: { total: number; today: number };
     }>('/api/developer/usage'),
   },
 };

@@ -151,10 +151,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 });
     }
 
+    // Fetch counts from the emails table dynamically to prevent out-of-sync bugs
+    const accountIds = (accounts || []).map(a => a.id);
+    const countsMap = new Map<string, { emailCount: number; unreadCount: number }>();
+    
+    if (accountIds.length > 0) {
+      // 1. Get total active emails count per account
+      const { data: totalCounts } = await supabaseAdmin!
+        .from('emails')
+        .select('account_id')
+        .in('account_id', accountIds)
+        .eq('is_deleted', false);
+        
+      // 2. Get unread active emails count per account
+      const { data: unreadCounts } = await supabaseAdmin!
+        .from('emails')
+        .select('account_id')
+        .in('account_id', accountIds)
+        .eq('is_read', false)
+        .eq('is_deleted', false);
+
+      // Initialize map entries
+      accountIds.forEach(id => countsMap.set(id, { emailCount: 0, unreadCount: 0 }));
+
+      // Aggregate total counts
+      totalCounts?.forEach(e => {
+        const entry = countsMap.get(e.account_id);
+        if (entry) entry.emailCount++;
+      });
+
+      // Aggregate unread counts
+      unreadCounts?.forEach(e => {
+        const entry = countsMap.get(e.account_id);
+        if (entry) entry.unreadCount++;
+      });
+    }
+
     const ownerMap = user.role === 'admin' ? await getOwnerMap(accounts || []) : new Map();
     const formattedAccounts = (accounts || []).map((a) => {
       const owner = a.user_id ? ownerMap.get(a.user_id) : null;
-      return formatAccount({ ...a, owner }, user.role === 'admin');
+      const formatted = formatAccount({ ...a, owner }, user.role === 'admin');
+      
+      // Override with live dynamic counts
+      const counts = countsMap.get(a.id) || { emailCount: 0, unreadCount: 0 };
+      formatted.emailCount = counts.emailCount;
+      formatted.unreadCount = counts.unreadCount;
+      
+      return formatted;
     });
 
     return NextResponse.json({
@@ -180,12 +223,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
+    const body = await request.json();
+
+    // Check if captcha is enabled
+    const { data: captchaEnabledSetting } = await supabaseAdmin!
+      .from('config')
+      .select('value')
+      .eq('key', 'captchaEnabled')
+      .maybeSingle();
+
+    const isCaptchaEnabled = captchaEnabledSetting?.value === true || captchaEnabledSetting?.value === 'true';
+
+    if (isCaptchaEnabled && auth.isGuest) {
+      const captchaToken = body.captchaToken;
+      if (!captchaToken) {
+        return NextResponse.json({ error: 'CAPTCHA token is required' }, { status: 400 });
+      }
+
+      const { data: captchaSecretSetting } = await supabaseAdmin!
+        .from('config')
+        .select('value')
+        .eq('key', 'captchaSecretKey')
+        .maybeSingle();
+
+      const secretKey = captchaSecretSetting?.value || '';
+
+      if (secretKey) {
+        try {
+          const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+          const verifyRes = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              secret: secretKey,
+              response: captchaToken,
+              remoteip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined,
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (!verifyData.success) {
+            return NextResponse.json({ error: 'Xác thực CAPTCHA thất bại, vui lòng thử lại.' }, { status: 400 });
+          }
+        } catch (err) {
+          console.error('[Accounts] CAPTCHA verification failed with error:', err);
+          return NextResponse.json({ error: 'Không thể kết nối đến máy chủ CAPTCHA' }, { status: 500 });
+        }
+      }
+    }
+
     const schema = Joi.object({
       localPart: Joi.string().pattern(/^[a-z0-9.-]{1,64}$/).allow('').default(''),
       domain: Joi.string().domain().required(),
+      captchaToken: Joi.string().allow('').optional(),
     });
 
-    const { error: schemaErr, value } = schema.validate(await request.json());
+    const { error: schemaErr, value } = schema.validate(body);
     if (schemaErr) {
       return NextResponse.json({ error: schemaErr.details[0].message }, { status: 400 });
     }
@@ -222,7 +315,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ account: existing }, { status: 200 });
+      return NextResponse.json({ error: 'Address already exists' }, { status: 409 });
     }
 
     // Create account

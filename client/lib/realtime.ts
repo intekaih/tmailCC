@@ -214,45 +214,60 @@ export function subscribeToEmails(
   const maxReconnectAttempts = 10;
   const baseReconnectDelay = 1000; // 1 second
 
-  // Create the channel and configure it BEFORE subscribing
-  const channel = supabase.channel(channelName);
+  console.log('[Realtime-Diagnostic] Preparing subscription for account:', accountId);
+  supabase.auth.getSession().then((res: any) => {
+    const session = res.data?.session;
+    const role = session?.user?.role || 'none (anon)';
+    const userId = session?.user?.id || 'none';
+    const email = session?.user?.email || 'none';
+    const hasSession = !!session;
+    console.log(`[Realtime-Diagnostic] Session Details -> Role: "${role}", UserId: "${userId}", Email: "${email}", HasSession: ${hasSession}`);
+  });
 
-  // Register the postgres_changes handler
-  channel.on(
+
+  // =============================================
+  // POSTGRES_CHANGES CHANNEL (Fallback for when Supabase fixes WAL/RLS)
+  // Primary broadcast channel is managed by RealtimeContext
+  // =============================================
+  const pgChannel = supabase.channel(channelName);
+
+  pgChannel.on(
     'postgres_changes',
     {
       event: 'INSERT',
       schema: 'public',
       table: 'emails',
-      filter: `account_id=eq.${accountId}`,
     },
     (payload: any) => {
-      const emailId = payload.new?.id;
+      console.log('[Realtime-PG] WAL insert event received:', payload.new?.id);
 
-      console.log('[Realtime] New email event received:', emailId);
-
-      // Deduplication check
-      if (enableDeduplication && emailId && globalSeenEmails.isDuplicate(emailId)) {
-        console.log('[Realtime] Duplicate email ignored:', emailId);
+      // Client-side filter
+      if (payload.new?.account_id !== accountId) {
         return;
       }
 
-      // Mark as seen
+      const emailId = payload.new?.id;
+
+      // Deduplication: skip if already received via broadcast
+      if (enableDeduplication && emailId && globalSeenEmails.isDuplicate(emailId)) {
+        console.log('[Realtime-PG] Already received via broadcast, skipping:', emailId);
+        return;
+      }
+
       if (emailId) {
         globalSeenEmails.markSeen(emailId);
-
-        // Broadcast to other tabs so they can update their trackers
         broadcastToTabs('email-seen', { emailId, accountId });
       }
 
       const email = formatEmailFromRealtime(payload.new);
+      console.log('[Realtime-PG] Dispatching email to callback:', email.subject);
       onNewEmail(email);
     }
   );
 
-  // Subscribe and handle status
-  channel.subscribe((status: string, err: any) => {
-    console.log('[Realtime] Channel status:', status, err);
+  // Subscribe to postgres_changes channel
+  pgChannel.subscribe((status: string, err: any) => {
+    console.log('[Realtime-PG] Channel status:', status, err || '');
 
       switch (status) {
         case 'SUBSCRIBED':
@@ -301,7 +316,7 @@ export function subscribeToEmails(
 
     setTimeout(() => {
       console.log('[Realtime] Attempting to resubscribe for account:', accountId);
-      channel.subscribe();
+      pgChannel.subscribe();
     }, delay);
   }
 
@@ -309,15 +324,19 @@ export function subscribeToEmails(
     unsubscribe: () => {
       console.log('[Realtime] Unsubscribing from emails for account:', accountId);
       reconnectAttempts = maxReconnectAttempts; // Prevent reconnection
-      supabase.removeChannel(channel);
+      supabase.removeChannel(pgChannel);
     },
-    channel,
+    channel: pgChannel,
   };
 }
 
-// ============================================
-// UTILITIES
-// ============================================
+/**
+ * Format raw database row into FormattedEmail.
+ * Exported for use by RealtimeContext broadcast handler.
+ */
+export function formatEmailFromRealtimeRow(row: any): FormattedEmail {
+  return formatEmailFromRealtime(row);
+}
 
 function formatEmailFromRealtime(row: any): FormattedEmail {
   return {

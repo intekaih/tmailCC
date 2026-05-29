@@ -11,7 +11,7 @@ interface DeveloperSettingsProps {
   onClose: () => void;
 }
 
-type Tab = 'keys' | 'webhooks' | 'usage';
+type Tab = 'keys' | 'webhooks' | 'usage' | 'dotmails' | 'password';
 
 const SCOPE_LABELS: Record<string, { label: string; description: string }> = {
   'accounts:create': { label: 'Tạo tài khoản email', description: 'Cho phép tạo email accounts mới' },
@@ -60,11 +60,12 @@ interface UsageStats {
   apiCalls: { today: number; thisMonth: number };
   webhookDeliveries: { today: number; thisMonth: number };
   accounts: { total: number };
+  emails: { total: number; today: number };
 }
 
 export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
   const { t, toast } = useApp();
-  const [tab, setTab] = useState<Tab>('keys');
+  const [tab, setTab] = useState<Tab>('usage');
   const modalRef = useRef<HTMLDivElement>(null);
   const subModalRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +74,17 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [dotmailParents, setDotmailParents] = useState<any[]>([]);
+  const [parentStatuses, setParentStatuses] = useState<Record<string, 'unchecked' | 'checking' | 'live' | 'dead'>>({});
+  const [newGmailAddress, setNewGmailAddress] = useState('');
+  const [newGmailAppPassword, setNewGmailAppPassword] = useState('');
+  const [showGmailHelp, setShowGmailHelp] = useState(false);
+  const [expandedParent, setExpandedParent] = useState<string | null>(null);
+  const [checkingParentId, setCheckingParentId] = useState<string | null>(null);
+  const [editingParentId, setEditingParentId] = useState<string | null>(null);
+  const [editingAppPassword, setEditingAppPassword] = useState('');
+  const [dotmailGenerating, setDotmailGenerating] = useState(false);
 
   // Modal states
   const [showCreateKey, setShowCreateKey] = useState(false);
@@ -84,7 +96,15 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const [confirmDeleteWebhook, setConfirmDeleteWebhook] = useState<string | null>(null);
 
-  const hasSubModal = showCreateKey || showCreateWebhook || !!createdKey || !!createdWebhook || !!confirmRevoke || !!confirmDeleteWebhook;
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  const hasSubModal = showCreateKey || showCreateWebhook || !!createdKey || !!createdWebhook || !!confirmRevoke || !!confirmDeleteWebhook || showGmailHelp;
 
   useFocusTrap(modalRef, !hasSubModal);
   useFocusTrap(subModalRef, hasSubModal);
@@ -98,6 +118,7 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
         else if (createdWebhook) setCreatedWebhook(null);
         else if (confirmRevoke) setConfirmRevoke(null);
         else if (confirmDeleteWebhook) setConfirmDeleteWebhook(null);
+        else if (showGmailHelp) setShowGmailHelp(false);
         else onClose();
       }
     };
@@ -122,11 +143,151 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
       } else if (tab === 'usage') {
         const data = await api.developer.usage();
         setUsage(data);
+      } else if (tab === 'dotmails') {
+        const data = await api.admin.dotmails();
+        setDotmailParents(data.parents || []);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Dotmail functions
+  async function loadDotmails() {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.admin.dotmails();
+      setDotmailParents(data.parents || []);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi tải Gmail Parents');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function triggerParentStatusCheck(id: string) {
+    setParentStatuses(prev => ({ ...prev, [id]: 'checking' }));
+    try {
+      const res = await api.admin.checkGmailParent(id);
+      if (res.success) {
+        setParentStatuses(prev => ({ ...prev, [id]: 'live' }));
+      } else {
+        setParentStatuses(prev => ({ ...prev, [id]: 'dead' }));
+      }
+    } catch {
+      setParentStatuses(prev => ({ ...prev, [id]: 'dead' }));
+    }
+  }
+
+  useEffect(() => {
+    if (tab === 'dotmails' && dotmailParents.length > 0) {
+      dotmailParents.forEach((parent: any) => {
+        if (!parentStatuses[parent.id]) {
+          triggerParentStatusCheck(parent.id);
+        }
+      });
+    }
+  }, [dotmailParents, tab]);
+
+  async function handleAddGmailParent() {
+    if (!newGmailAddress.trim() || !newGmailAppPassword.trim()) {
+      toast('Vui lòng nhập địa chỉ Gmail và mật khẩu ứng dụng', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.admin.addGmailParent({
+        address: newGmailAddress.trim(),
+        app_password: newGmailAppPassword.trim(),
+      });
+      setNewGmailAddress('');
+      setNewGmailAppPassword('');
+      toast('Đã thêm Gmail Parent thành công', 'success');
+      loadDotmails();
+    } catch (err: any) {
+      toast(err.message || 'Thất bại khi thêm Gmail Parent', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteGmailParent(id: string, address: string) {
+    if (!window.confirm(`Xóa ${address} và tất cả dotmail liên quan?`)) return;
+    setLoading(true);
+    try {
+      await api.admin.deleteGmailParent(id);
+      toast('Đã xóa Gmail Parent', 'success');
+      loadDotmails();
+    } catch (err: any) {
+      toast(err.message || 'Thất bại khi xóa Gmail Parent', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateParent(id: string) {
+    if (!editingAppPassword.trim()) {
+      toast('Vui lòng nhập mật khẩu ứng dụng mới', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.admin.updateGmailParent(id, editingAppPassword.trim());
+      setEditingParentId(null);
+      setEditingAppPassword('');
+      toast('Cập nhật mật khẩu ứng dụng thành công', 'success');
+      loadDotmails();
+    } catch (err: any) {
+      toast(err.message || 'Thất bại khi cập nhật mật khẩu ứng dụng', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCheckGmailParent(id: string) {
+    setCheckingParentId(id);
+    setParentStatuses(prev => ({ ...prev, [id]: 'checking' }));
+    try {
+      const res = await api.admin.checkGmailParent(id);
+      if (res.success) {
+        setParentStatuses(prev => ({ ...prev, [id]: 'live' }));
+        toast(res.message || 'Kết nối thành công!', 'success');
+      } else {
+        setParentStatuses(prev => ({ ...prev, [id]: 'dead' }));
+        toast(res.error || 'Lỗi kết nối IMAP', 'error');
+      }
+    } catch (err: any) {
+      setParentStatuses(prev => ({ ...prev, [id]: 'dead' }));
+      toast(err.message || 'Thất bại khi kết nối IMAP', 'error');
+    } finally {
+      setCheckingParentId(null);
+    }
+  }
+
+  async function handleGenerateDotmails(parentId: string) {
+    setDotmailGenerating(true);
+    try {
+      const data = await api.admin.generateDotmails(parentId);
+      toast(`Đã tạo ${data.total} dotmail`, 'success');
+      loadDotmails();
+    } catch (err: any) {
+      toast(err.message || 'Thất bại khi sinh dotmail', 'error');
+    } finally {
+      setDotmailGenerating(false);
+    }
+  }
+
+  async function handleDeleteDotmail(id: string, address: string) {
+    if (!window.confirm(`Xóa dotmail: ${address}?`)) return;
+    try {
+      await api.admin.deleteDotmail(id);
+      toast('Đã xóa dotmail', 'success');
+      loadDotmails();
+    } catch (err: any) {
+      toast(err.message || 'Thất bại khi xóa dotmail', 'error');
     }
   }
 
@@ -241,7 +402,41 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
     }
   }
 
+  function setPasswordField(key: string, value: string) {
+    setPasswordForm(prev => ({ ...prev, [key]: value }));
+    setPasswordError('');
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError(t('passwordMismatch'));
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await api.auth.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      toast(t('passwordChanged'), 'success');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
   const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
+    {
+      id: 'usage',
+      label: 'Thống kê',
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    },
     {
       id: 'keys',
       label: 'API Keys',
@@ -253,9 +448,14 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     },
     {
-      id: 'usage',
-      label: 'Usage',
-      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+      id: 'dotmails',
+      label: 'Dotmail',
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="2"/><polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="2"/></svg>,
+    },
+    {
+      id: 'password',
+      label: 'Đổi mật khẩu',
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 1.5 1.5M15.5 7.5L14 6" /></svg>,
     },
   ];
 
@@ -442,16 +642,24 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
                 </h3>
                 <div className="stats-grid">
                   <div className="stat-card">
+                    <div className="stat-value">{usage.accounts.total}</div>
+                    <div className="stat-label">Hộp thư đang dùng</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-value">{usage.emails.total}</div>
+                    <div className="stat-label">Tổng thư đã nhận</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-value">{usage.emails.today}</div>
+                    <div className="stat-label">Thư nhận hôm nay</div>
+                  </div>
+                  <div className="stat-card">
                     <div className="stat-value">{usage.apiKeys.active}</div>
-                    <div className="stat-label">API Keys Active</div>
+                    <div className="stat-label">API Keys Hoạt động</div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-value">{usage.webhooks.active}</div>
-                    <div className="stat-label">Webhooks Active</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value">{usage.accounts.total}</div>
-                    <div className="stat-label">Email Accounts</div>
+                    <div className="stat-label">Webhooks Hoạt động</div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-value">{usage.apiCalls.today}</div>
@@ -463,11 +671,285 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
                   </div>
                   <div className="stat-card">
                     <div className="stat-value">{usage.webhookDeliveries.today}</div>
-                    <div className="stat-label">Webhook Deliveries Hôm nay</div>
+                    <div className="stat-label">Webhooks Gửi hôm nay</div>
                   </div>
                 </div>
               </div>
             ) : null
+          )}
+
+          {/* Dotmails Tab */}
+          {tab === 'dotmails' && (
+            loading ? (
+              <StatsSkeleton />
+            ) : (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Gmail Parent & Dotmails</h3>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                      Thêm Gmail gốc và mật khẩu ứng dụng để tạo danh sách dotmail cá nhân.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="add-domain-form" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <input
+                    className="input"
+                    style={{ flex: 1 }}
+                    placeholder="Gmail gốc (vd: 00yt0001@gmail.com)"
+                    value={newGmailAddress}
+                    onChange={e => setNewGmailAddress(e.target.value)}
+                  />
+                  <input
+                    className="input"
+                    style={{ flex: 1 }}
+                    type="password"
+                    placeholder="App Password (16 ký tự)"
+                    value={newGmailAppPassword}
+                    onChange={e => setNewGmailAppPassword(e.target.value)}
+                  />
+                  <button className="btn btn-primary" onClick={handleAddGmailParent} disabled={loading || !newGmailAddress.trim() || !newGmailAppPassword.trim()}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginRight: 4 }}><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    Thêm Gmail
+                  </button>
+                  <button 
+                    className="btn btn-ghost" 
+                    style={{ padding: '0 8px', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                    onClick={() => setShowGmailHelp(true)}
+                    title="Hướng dẫn cấu hình Gmail"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                  </button>
+                </div>
+
+                {dotmailParents.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 13 }}>
+                    Chưa có Gmail nào. Thêm Gmail gốc và App Password để bắt đầu.
+                  </div>
+                )}
+
+                {dotmailParents.map((parent: any) => {
+                  const isExpanded = expandedParent === parent.id;
+                  const dotmails = parent.dotmails || [];
+
+                  return (
+                    <div key={parent.id} style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                      <div
+                        style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'var(--bg-secondary)' }}
+                        onClick={() => setExpandedParent(isExpanded ? null : parent.id)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="2"/><polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="2"/></svg>
+                          <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{parent.address}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: 4 }}>
+                            {dotmails.length} dotmails
+                          </span>
+                          {(() => {
+                            const status = parentStatuses[parent.id] || 'unchecked';
+                            if (status === 'checking') {
+                              return (
+                                <span style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '2px 8px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="32" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                                  Đang check
+                                </span>
+                              );
+                            }
+                            if (status === 'live') {
+                              return (
+                                <span style={{ fontSize: 11, color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
+                                  Live
+                                </span>
+                              );
+                            }
+                            if (status === 'dead') {
+                              return (
+                                <span style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
+                                  Dead
+                                </span>
+                              );
+                            }
+                            return (
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 12 }}>
+                                Chưa check
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ padding: 4 }}
+                            onClick={(e) => { e.stopPropagation(); handleCheckGmailParent(parent.id); }} 
+                            disabled={checkingParentId !== null} 
+                            title="Kiểm tra kết nối"
+                          >
+                            {checkingParentId === parent.id ? (
+                              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="32" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                              </svg>
+                            )}
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ padding: 4 }}
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setEditingParentId(editingParentId === parent.id ? null : parent.id);
+                              setEditingAppPassword('');
+                            }} 
+                            title="Sửa mật khẩu ứng dụng"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button className="btn btn-ghost btn-sm" style={{ padding: 4 }} onClick={(e) => { e.stopPropagation(); handleGenerateDotmails(parent.id); }} disabled={dotmailGenerating} title="Sinh dotmail">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                          </button>
+                          <button className="btn btn-ghost btn-sm" style={{ padding: 4 }} onClick={(e) => { e.stopPropagation(); handleDeleteGmailParent(parent.id, parent.address); }} title="Xóa">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                          </button>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                      </div>
+
+                      {editingParentId === parent.id && (
+                        <div 
+                          style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            className="input"
+                            style={{ flex: 1, fontSize: 12.5, height: 32, padding: '4px 10px' }}
+                            placeholder="Nhập Mật khẩu ứng dụng mới (16 ký tự)"
+                            type="password"
+                            value={editingAppPassword}
+                            onChange={e => setEditingAppPassword(e.target.value)}
+                          />
+                          <button 
+                            className="btn btn-primary btn-sm" 
+                            style={{ height: 32, padding: '0 12px', fontSize: 12 }}
+                            onClick={() => handleUpdateParent(parent.id)}
+                            disabled={loading || !editingAppPassword.trim()}
+                          >
+                            Lưu
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ height: 32, padding: '0 12px', fontSize: 12 }}
+                            onClick={() => setEditingParentId(null)}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      )}
+
+                      {isExpanded && dotmails.length > 0 && (
+                        <div style={{ maxHeight: 300, overflowY: 'auto', padding: '8px 14px', background: 'var(--bg-tertiary)' }}>
+                          {dotmails.map((d: any) => (
+                            <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                              <span style={{ fontFamily: 'monospace', fontSize: 12.5, color: 'var(--text-primary)' }}>{d.address}</span>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button className="btn btn-ghost btn-sm" style={{ padding: '3px 6px' }} onClick={() => { navigator.clipboard.writeText(d.address); toast('Đã copy', 'success'); }} title="Copy">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2"/></svg>
+                                </button>
+                                <button className="btn btn-ghost btn-sm" style={{ padding: '3px 6px', color: 'var(--error)' }} onClick={() => handleDeleteDotmail(d.id, d.address)} title="Xóa">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {isExpanded && dotmails.length === 0 && (
+                        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5, background: 'var(--bg-tertiary)' }}>
+                          Chưa có dotmail. Nhấn nút sinh dotmail ở trên.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {/* Password Tab */}
+          {tab === 'password' && (
+            <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px 0' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                {t('changePassword')}
+              </h3>
+              <form onSubmit={handlePasswordSubmit}>
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    {t('currentPassword')}
+                  </label>
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="••••••••"
+                    value={passwordForm.currentPassword}
+                    onChange={e => setPasswordField('currentPassword', e.target.value)}
+                    required
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    {t('newPassword')}
+                  </label>
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder={t('minChars')}
+                    value={passwordForm.newPassword}
+                    onChange={e => setPasswordField('newPassword', e.target.value)}
+                    required
+                    minLength={8}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    {t('confirmNewPassword')}
+                  </label>
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder={t('minChars')}
+                    value={passwordForm.confirmPassword}
+                    onChange={e => setPasswordField('confirmPassword', e.target.value)}
+                    required
+                    minLength={8}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                {passwordError && <div className="form-error" style={{ marginBottom: 16, color: 'var(--error)', fontSize: 12.5 }}>{passwordError}</div>}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={passwordLoading}
+                  style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}
+                >
+                  {passwordLoading ? <span className="loading-spinner" style={{ width: 16, height: 16, marginRight: 8 }} /> : null}
+                  {passwordLoading ? t('changingPassword') : t('changePassword')}
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>
@@ -505,7 +987,27 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Scopes *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Scopes *</label>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button 
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 11.5, padding: '2px 8px', height: 'auto', minHeight: 'unset', color: 'var(--accent)', fontWeight: 500 }}
+                      onClick={() => setNewKeyData(prev => ({ ...prev, scopes: [...API_KEY_SCOPES] }))}
+                    >
+                      Chọn tất cả
+                    </button>
+                    <button 
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 11.5, padding: '2px 8px', height: 'auto', minHeight: 'unset', color: 'var(--text-muted)', fontWeight: 500 }}
+                      onClick={() => setNewKeyData(prev => ({ ...prev, scopes: [] }))}
+                    >
+                      Bỏ chọn hết
+                    </button>
+                  </div>
+                </div>
                 <div className="scope-list">
                   {API_KEY_SCOPES.map(scopeId => {
                     const scope = SCOPE_LABELS[scopeId];
@@ -612,7 +1114,27 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Events *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Events *</label>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button 
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 11.5, padding: '2px 8px', height: 'auto', minHeight: 'unset', color: 'var(--accent)', fontWeight: 500 }}
+                      onClick={() => setNewWebhookData(prev => ({ ...prev, events: [...WEBHOOK_EVENTS] }))}
+                    >
+                      Chọn tất cả
+                    </button>
+                    <button 
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 11.5, padding: '2px 8px', height: 'auto', minHeight: 'unset', color: 'var(--text-muted)', fontWeight: 500 }}
+                      onClick={() => setNewWebhookData(prev => ({ ...prev, events: [] }))}
+                    >
+                      Bỏ chọn hết
+                    </button>
+                  </div>
+                </div>
                 <div className="scope-list">
                   {WEBHOOK_EVENTS.map(eventId => {
                     const event = WEBHOOK_EVENT_LABELS[eventId];
@@ -1076,6 +1598,84 @@ export default function DeveloperSettings({ onClose }: DeveloperSettingsProps) {
             box-shadow: 0 25px 80px -10px rgba(0, 0, 0, 0.15), 0 0 40px rgba(28, 108, 161, 0.02);
           }
         `}</style>
+
+      {showGmailHelp && (
+        <div 
+          className="create-modal-overlay" 
+          style={{ zIndex: 1010 }}
+          onClick={() => setShowGmailHelp(false)}
+        >
+          <div 
+            className="create-modal" 
+            style={{ 
+              width: '100%', 
+              maxWidth: 450, 
+              padding: 24, 
+              background: 'var(--bg-primary)', 
+              borderRadius: 12, 
+              border: '1px solid var(--border)',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>Hướng dẫn cấu hình Gmail</h3>
+              <button 
+                className="modal-close" 
+                style={{ padding: 4 }} 
+                onClick={() => setShowGmailHelp(false)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 12, color: 'var(--text-primary)' }}>
+              <p>Để hệ thống tmailCC có thể kết nối và tự động lấy mã OTP từ tài khoản Gmail gốc của bạn, vui lòng cấu hình theo các bước sau:</p>
+              
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>1</span>
+                <div>
+                  <strong>Bật xác minh 2 lớp (2-Step Verification)</strong>
+                  <br />
+                  Truy cập vào trang cấu hình bảo mật tài khoản Google của bạn và kích hoạt xác minh 2 lớp:
+                  <br />
+                  👉 <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Kích hoạt xác minh 2 lớp</a>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>2</span>
+                <div>
+                  <strong>Tạo Mật khẩu ứng dụng (App Password)</strong>
+                  <br />
+                  Sau khi đã bật xác minh 2 lớp, truy cập liên kết dưới đây để tạo Mật khẩu ứng dụng mới cho Mail/IMAP:
+                  <br />
+                  👉 <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Tạo Mật khẩu ứng dụng Google</a>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', flexShrink: 0 }}>3</span>
+                <div>
+                  <strong>Nhập thông tin và Thêm Gmail</strong>
+                  <br />
+                  Nhập địa chỉ Gmail gốc (ví dụ: <code>00yt0001@gmail.com</code>) và mật khẩu ứng dụng vừa tạo (16 ký tự viết liền, không dấu cách) vào ô nhập liệu bên ngoài rồi nhấn <strong>Thêm Gmail</strong>.
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => setShowGmailHelp(false)}>
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

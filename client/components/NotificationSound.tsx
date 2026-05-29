@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-const SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const SOUND_URL = '/notification.mp3';
 
 interface NotificationSoundProps {
   play: boolean;

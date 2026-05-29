@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, User, Account, Email, requestNotificationPermission, copyToClipboard } from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
+import { createClient as createDirectSupabaseClient } from '@supabase/supabase-js';
 import { getGuestAccounts, saveGuestAccount, removeGuestAccount } from '@/components/Sidebar';
 import AuthModal from '@/components/AuthModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
@@ -33,6 +35,45 @@ import type { InitialServerData } from './types';
 
 interface EmailListItem extends Email {
   _id: string;
+}
+
+// ============================================
+// MODULE-LEVEL BROADCAST SINGLETON
+// Created once when module loads. React Strict Mode cannot destroy it.
+// Supabase Realtime broadcast channel for instant email notifications.
+// ============================================
+let _broadcastChannel: any = null;
+
+function getBroadcastChannel() {
+  if (_broadcastChannel) return _broadcastChannel;
+
+  if (typeof window === 'undefined') return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+
+  const client = createDirectSupabaseClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  _broadcastChannel = client.channel('email-notifications');
+
+  // Forward broadcast events to window custom events
+  // This decouples the Supabase channel from React lifecycle
+  _broadcastChannel.on('broadcast', { event: 'new-email' }, (payload: any) => {
+    console.log('[BroadcastSingleton] Received email event, dispatching to window');
+    window.dispatchEvent(new CustomEvent('tmail:broadcast-email', { detail: payload }));
+  });
+
+  _broadcastChannel.subscribe((status: string, err: any) => {
+    console.log('[BroadcastSingleton] Channel status:', status, err || '');
+    if (status === 'SUBSCRIBED') {
+      console.log('[BroadcastSingleton] ✅ Listening (module-level, React-proof)');
+    }
+  });
+
+  return _broadcastChannel;
 }
 
 // ============================================
@@ -118,6 +159,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   const [showQRModal, setShowQRModal] = useState<string | null>(null);
   const [domainVersion, setDomainVersion] = useState(0);
   const [darkMode, setDarkMode] = useState(true);
+  const [themeLoaded, setThemeLoaded] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -166,15 +208,117 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   }, [showToast, soundEnabled, notificationsEnabled, t, locale, emails]);
 
   // ============================================
-  // REALTIME HANDLER
+  // DIRECT BROADCAST LISTENER
+  // Uses module-level singleton (defined at top of file)
+  // React Strict Mode cannot destroy it
+  // ============================================
+
+  // Refs to avoid stale closures in the broadcast handler
+  const soundEnabledRef = useRef(soundEnabled);
+  const notificationsEnabledRef = useRef(notificationsEnabled);
+  const tRef = useRef(t);
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+  useEffect(() => { notificationsEnabledRef.current = notificationsEnabled; }, [notificationsEnabled]);
+  useEffect(() => { tRef.current = t; }, [t]);
+
+  useEffect(() => {
+    const channel = getBroadcastChannel();
+    if (!channel) return;
+
+    const handler = (payload: any) => {
+      const row = payload.payload;
+      if (!row?.id) return;
+
+      console.log('[DirectBroadcast] Email notification:', row.id, 'account:', row.account_id, 'subject:', row.subject);
+
+      // Skip if already seen
+      if (seenEmailIds.current.has(row.id)) {
+        console.log('[DirectBroadcast] Already seen, skipping:', row.id);
+        return;
+      }
+      seenEmailIds.current.add(row.id);
+
+      // 1. Show toast immediately (using minimal broadcast metadata)
+      showToast(`${tRef.current('newEmailFrom')} ${row.from_name || row.from_address || ''}`, 'info');
+
+      // 2. Play notification sound
+      if (soundEnabledRef.current) {
+        window.dispatchEvent(new CustomEvent('tmail:play-notification-sound'));
+      }
+
+      // 3. Browser notification if tab hidden
+      if (notificationsEnabledRef.current && document.visibilityState === 'hidden') {
+        requestNotificationPermission().then((perm) => {
+          if (perm === 'granted') {
+            showNotification(
+              row.from_name || row.from_address || '',
+              row.subject || '(No Subject)',
+              {
+                tag: `email-${row.account_id}`,
+                data: { emailId: row.id, accountId: row.account_id },
+                onClick: () => { window.focus(); },
+              }
+            );
+          }
+        });
+      }
+
+      // 4. Update sidebar counts
+      setAccounts(prev => prev.map(acc =>
+        acc.id === row.account_id
+          ? { ...acc, emailCount: (acc.emailCount || 0) + 1, unreadCount: (acc.unreadCount || 0) + 1 }
+          : acc
+      ));
+
+      // 5. Fetch full email via authenticated API (RLS protected)
+      const currentAcc = selectedAccountRef.current;
+      if (currentAcc && currentAcc.id === row.account_id) {
+        api.emails.list(currentAcc.address, { limit: 100 }).then(res => {
+          const freshEmails = res.emails;
+          setEmails(prev => {
+            const existingIds = new Set(prev.map(e => e._id));
+            const toAdd = freshEmails.filter((e: Email) => !existingIds.has(e._id));
+            if (toAdd.length === 0) return prev;
+            return [...toAdd, ...prev];
+          });
+          setUnreadCount(res.unreadCount);
+        }).catch(err => {
+          console.warn('[DirectBroadcast] Failed to fetch full email:', err);
+        });
+      }
+    };
+
+    // Register handler via window event (survives React Strict Mode)
+    const eventHandler = (e: Event) => handler((e as CustomEvent).detail);
+    window.addEventListener('tmail:broadcast-email', eventHandler);
+
+    return () => {
+      window.removeEventListener('tmail:broadcast-email', eventHandler);
+    };
+  }, []); // Mount once - refs keep values fresh
+
+  // ============================================
+  // REALTIME HANDLER (legacy - kept for postgres_changes fallback)
   // ============================================
 
   const handleNewEmailFromRealtime = useCallback((email: FormattedEmail) => {
     const cb = callbacksRef.current;
+    console.log('[Page-Diagnostic] handleNewEmailFromRealtime called, callbacksRef.current is:', cb ? 'SET' : 'NULL', 'showToast:', cb?.showToast ? 'AVAILABLE' : 'MISSING');
     if (!cb) return;
 
     const currentAccount = selectedAccountRef.current;
-    if (!currentAccount || email.account !== currentAccount.id) return;
+    if (!currentAccount) return;
+
+    // Admin sees all emails; regular users only see their selected account
+    const isCurrentAccount = email.account === currentAccount.id;
+
+    console.log('[Page-Diagnostic] handleNewEmailFromRealtime triggered with:', {
+      emailId: email._id,
+      subject: email.subject,
+      emailAccount: email.account,
+      currentAccountId: currentAccount?.id,
+      isCurrentAccount,
+    });
 
     // Deduplication at page level
     if (seenEmailIds.current.has(email._id)) {
@@ -189,14 +333,16 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
     console.log('[Page] Processing new email from realtime:', email._id);
 
-    // Update emails list
-    cb.setEmails(prev => {
-      if (prev.some(e => e._id === email._id)) return prev;
-      return [email as unknown as Email, ...prev];
-    });
+    // Only add to email list if it's for the currently viewed account
+    if (isCurrentAccount) {
+      cb.setEmails(prev => {
+        if (prev.some(e => e._id === email._id)) return prev;
+        return [email as unknown as Email, ...prev];
+      });
 
-    // Update unread count
-    cb.setUnreadCount(prev => prev + 1);
+      // Update unread count for current view
+      cb.setUnreadCount(prev => prev + 1);
+    }
 
     // Update the account's counts in the accounts sidebar list immediately
     cb.setAccounts(prev => prev.map(acc => 
@@ -209,11 +355,11 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
         : acc
     ));
 
-    // Show toast
+    // Show toast (always, for any account)
     cb.showToast(`${cb.t('newEmailFrom')} ${email.fromName || email.from}`, 'info');
 
-    // Play sound if tab is visible and sound enabled
-    if (cb.soundEnabled && document.visibilityState === 'visible') {
+    // Play sound if enabled (always - regardless of tab visibility)
+    if (cb.soundEnabled) {
       window.dispatchEvent(new CustomEvent('tmail:play-notification-sound'));
     }
 
@@ -229,8 +375,8 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
             email.fromName || email.from,
             email.subject,
             {
-              tag: `email-${currentAccount.id}`,
-              data: { emailId: email._id, accountId: currentAccount.id },
+              tag: `email-${email.account}`,
+              data: { emailId: email._id, accountId: email.account },
               verificationCode,
               onClick: () => {
                 window.focus();
@@ -261,6 +407,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   useEffect(() => {
     selectedAccountRef.current = selectedAccount;
   }, [selectedAccount]);
+
 
   // ============================================
   // MULTI-TAB SYNC
@@ -353,29 +500,63 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
   useEffect(() => {
     const storedDark = localStorage.getItem('tmail_darkMode');
-    if (storedDark !== null) setDarkMode(storedDark === 'true');
-    else setDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    let isDark = true;
+    if (storedDark !== null) {
+      isDark = storedDark === 'true';
+    } else {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    setDarkMode(isDark);
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    setThemeLoaded(true);
 
     const storedSound = localStorage.getItem('tmail_soundEnabled');
     if (storedSound !== null) setSoundEnabled(storedSound === 'true');
 
     const storedNotif = localStorage.getItem('tmail_notifEnabled');
-    if (storedNotif !== null) setNotificationsEnabled(storedNotif === 'true');
+    if (storedNotif !== null) {
+      // Respect local storage preference, but override if browser blocked it
+      const hasPermission = typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+      setNotificationsEnabled(storedNotif === 'true' && hasPermission);
+    } else {
+      // First time - check if permission is already granted
+      const hasPermission = typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+      setNotificationsEnabled(hasPermission);
+    }
 
     const storedLocale = localStorage.getItem('tmail_locale') as Locale | null;
     if (storedLocale === 'en' || storedLocale === 'vi') setLocale(storedLocale);
 
     const token = localStorage.getItem('tmail_token');
     if (token) {
-      api.auth.me().then(res => setUser(res.user)).catch(() => {
+      api.auth.me().then(async res => {
+        if (res.supabase_access_token) {
+          try {
+            const supabase = createClient();
+            await supabase.auth.setSession({
+              access_token: res.supabase_access_token,
+              refresh_token: '',
+            });
+            console.log('[Startup] Supabase authenticated session established.');
+          } catch (err) {
+            console.error('[Startup] Failed to set supabase session:', err);
+          }
+        }
+        setUser(res.user);
+      }).catch(() => {
         localStorage.removeItem('tmail_token');
+        setUser(null);
       }).finally(() => setLoading(false));
     } else {
-      loadGuestAccounts();
+      setUser(null);
+      setLoading(false);
     }
   }, []);
 
   const loadGuestAccounts = async () => {
+    setAccounts([]);
+    setSelectedAccount(null);
+    setEmails([]);
     const guestAccounts = getGuestAccounts();
     if (guestAccounts.length === 0) { setLoading(false); return; }
 
@@ -411,9 +592,10 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   // ============================================
 
   useEffect(() => {
+    if (!themeLoaded) return;
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     localStorage.setItem('tmail_darkMode', String(darkMode));
-  }, [darkMode]);
+  }, [darkMode, themeLoaded]);
 
   useEffect(() => { localStorage.setItem('tmail_soundEnabled', String(soundEnabled)); }, [soundEnabled]);
 
@@ -535,11 +717,11 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     loadEmails(account);
   }
 
-  async function handleCreateAccount(address: string) {
+  async function handleCreateAccount(address: string, captchaToken?: string) {
     const [localPart, domain] = address.split('@');
     if (!user) saveGuestAccount({ address, localPart, domain, createdAt: new Date().toISOString(), lastUsed: new Date().toISOString() });
     try {
-      const account = await api.accounts.create({ localPart, domain });
+      const account = await api.accounts.create({ localPart, domain, captchaToken });
       setAccounts(prev => [account, ...prev]);
       setSelectedAccount(account);
       loadEmails(account);
@@ -636,9 +818,14 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   function handleDomainsChanged() { setDomainVersion(v => v + 1); }
 
   useEffect(() => {
-    if (!loading && user) loadAccounts();
-    if (!loading && !user) { setAccounts([]); setSelectedAccount(null); setEmails([]); }
-  }, [user]); // eslint-disable-line
+    if (!loading) {
+      if (user) {
+        loadAccounts();
+      } else {
+        loadGuestAccounts();
+      }
+    }
+  }, [user, loading]); // eslint-disable-line
 
   const totalUnread = accounts.reduce((sum, acc) => sum + (acc.unreadCount || 0), 0);
 
@@ -706,6 +893,12 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
                 <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </button>
+            <a href="/" className="btn btn-ghost btn-sm flex items-center justify-center" title="Trang chủ & API Guide" aria-label="Trang chủ & API Guide">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </a>
             {!user && <button className="btn btn-primary btn-sm" onClick={() => setShowAuthModal(true)}>{t('signIn')}</button>}
             {user && (
               <div className="user-menu">
@@ -727,15 +920,10 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
                     </svg>
                   </button>
                 )}
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowChangePassword(true)} title={t('changePassword')} aria-label={t('changePassword')}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowDeveloperSettings(true)} title="Developer API" aria-label="Developer API">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowDeveloperSettings(true)} title={locale === 'vi' ? 'Cài đặt tài khoản & API' : 'Account & API Settings'} aria-label={locale === 'vi' ? 'Cài đặt tài khoản & API' : 'Account & API Settings'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
                 </button>
                 <button className="btn btn-ghost btn-sm" onClick={handleLogout} title={t('logout')} aria-label={t('logout')}>
@@ -751,9 +939,18 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
           <div className="topbar-right">
             {/* Realtime status indicator */}
-            <div className={`realtime-indicator ${isConnected ? 'connected' : 'disconnected'}`} title={isConnected ? 'Real-time connected' : `Status: ${connectionStatus}`}>
+            <div 
+              className={`realtime-indicator ${isConnected ? 'connected' : 'disconnected'}`} 
+              title={
+                isConnected 
+                  ? (locale === 'vi' ? 'Nhận thư tự động: Đang hoạt động (Live)' : 'Real-time update: Active (Live)')
+                  : (locale === 'vi' 
+                      ? 'Nhận thư tự động bị tắt để bảo vệ quyền riêng tư của tài khoản Khách. Hãy nhấn nút Làm Mới thư hoặc Đăng Nhập để bật Live.' 
+                      : 'Real-time updates disabled for Guest privacy security. Please click the Refresh button or Sign In to enable Live.')
+              }
+            >
               <div className="realtime-dot" />
-              <span className="realtime-label">{isConnected ? 'Live' : '...'}</span>
+              <span className="realtime-label">{isConnected ? 'Live' : (locale === 'vi' ? 'Tĩnh' : 'Safe')}</span>
             </div>
 
             <button className={`icon-btn ${soundEnabled ? 'active' : ''}`} onClick={() => setSoundEnabled(!soundEnabled)} title={soundEnabled ? t('soundOn') : t('soundOff')} aria-label={soundEnabled ? t('soundOn') : t('soundOff')}>

@@ -3,53 +3,41 @@
  * 
  * This is a Next.js Server Component that:
  * - Provides global metadata (SEO)
- * - Loads Google Fonts
+ * - Loads Google Fonts for the Cyberpunk Design System
  * - Fetches initial session state server-side
  * - Sets the HTML lang attribute
  */
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, Playfair_Display, Noto_Serif_JP, Shippori_Mincho, Cinzel } from 'next/font/google';
+import { Playfair_Display, Source_Serif_4, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin', 'vietnamese'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-plus-jakarta-sans',
-  display: 'swap',
-});
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin', 'vietnamese'],
-  weight: ['400', '600', '700'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  style: ['normal', 'italic'],
   variable: '--font-playfair-display',
   display: 'swap',
 });
 
-const notoSerifJp = Noto_Serif_JP({
-  subsets: ['latin'],
+const sourceSerif4 = Source_Serif_4({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['300', '400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-source-serif',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin', 'vietnamese'],
   weight: ['400', '500', '700'],
-  variable: '--font-noto-serif-jp',
-  display: 'swap',
-});
-
-const shipporiMincho = Shippori_Mincho({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-shippori-mincho',
-  display: 'swap',
-});
-
-const cinzel = Cinzel({
-  subsets: ['latin'],
-  weight: ['500', '700'],
-  variable: '--font-cinzel',
+  variable: '--font-jetbrains-mono',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'tmailCC - Webmail System',
-  description: 'Permanent webmail system with real-time inbox, multi-domain support, and advanced management. Built with Next.js, Supabase, and TypeScript.',
-  keywords: ['webmail', 'email', 'tmailCC', 'supabase', 'nextjs'],
+  title: 'tmailCC - Hệ thống Webmail Tạm thời & Tên miền Riêng',
+  description: 'Hệ thống webmail tạm thời và tên miền riêng chuyên nghiệp. Nhận email thời gian thực, tích hợp API hiệu năng cao.',
+  keywords: ['email tạm thời', 'temp mail', 'monochrome mail', 'mail api', 'otp detector', 'dotmail', 'custom domain mail'],
   icons: {
     icon: '/favicon.ico',
   },
@@ -63,7 +51,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${plusJakartaSans.variable} ${playfairDisplay.variable} ${notoSerifJp.variable} ${shipporiMincho.variable} ${cinzel.variable}`}
+      className={`${playfairDisplay.variable} ${sourceSerif4.variable} ${jetbrainsMono.variable} light`}
     >
       <body>{children}</body>
     </html>

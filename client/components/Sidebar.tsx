@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api, Account } from '@/lib/api';
 import { useApp } from '@/lib/AppContext';
 import AnimatedEmptyState from '@/components/AnimatedText';
+import Turnstile from '@/components/Turnstile';
 
 // ============================================
 // LOCAL STORAGE KEYS
@@ -54,7 +55,7 @@ interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   onSelectAccount: (account: Account) => void;
-  onCreateAccount: (address: string) => void;
+  onCreateAccount: (address: string, captchaToken?: string) => Promise<any>;
   onDeleteAccount: (address: string) => void;
   onCopyAddress: (address: string) => void;
   onShowQR: (address: string) => void;
@@ -79,7 +80,7 @@ export default function Sidebar({
   totalUnread,
   domainVersion,
 }: SidebarProps) {
-  const { t, toast, user, locale } = useApp();
+  const { t, toast, user, locale, darkMode } = useApp();
   const isAdmin = user?.role === 'admin';
   const [showCreate, setShowCreate] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState('');
@@ -91,9 +92,27 @@ export default function Sidebar({
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [availableDomains, setAvailableDomains] = useState<string[]>([]);
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [guestLoading, setGuestLoading] = useState(false);
   const hasSetDefaultFilter = useRef(false);
   const [dotmailAccounts, setDotmailAccounts] = useState<any[]>([]);
+
+  // Captcha states
+  const [captchaConfig, setCaptchaConfig] = useState<{ enabled: boolean; siteKey: string } | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string>('');
+  const [captchaVersion, setCaptchaVersion] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      fetch('/api/config')
+        .then(res => res.json())
+        .then(data => {
+          setCaptchaConfig({
+            enabled: data.captchaEnabled,
+            siteKey: data.captchaSiteKey,
+          });
+        })
+        .catch(err => console.error('Failed to load captcha config:', err));
+    }
+  }, [user]);
 
   // Set default filter for admin to show only their own accounts initially
   useEffect(() => {
@@ -104,7 +123,7 @@ export default function Sidebar({
   }, [user, isAdmin]);
 
   const loadDotmails = async () => {
-    if (!isAdmin) return;
+    if (!user) return;
     try {
       const res = await api.admin.dotmails();
       const allDotmails = (res.parents || []).flatMap((parent: any) => {
@@ -125,12 +144,12 @@ export default function Sidebar({
   };
 
   useEffect(() => {
-    if (isAdmin) {
+    if (user) {
       loadDotmails();
     } else {
       setDotmailAccounts([]);
     }
-  }, [user, isAdmin, domainVersion, accounts.length]);
+  }, [user, domainVersion, accounts.length]);
 
   const loadDomains = async () => {
     try {
@@ -149,45 +168,6 @@ export default function Sidebar({
     }
   };
 
-  // Load guest accounts on mount (for non-logged-in users)
-  useEffect(() => {
-    if (!user && accounts.length === 0) {
-      loadGuestAccountsFromStorage();
-    }
-  }, [user]);
-
-  // Load guest accounts from localStorage and sync with server
-  const loadGuestAccountsFromStorage = async () => {
-    const guestAccounts = getGuestAccounts();
-    if (guestAccounts.length === 0) return;
-
-    setGuestLoading(true);
-    const syncedAccounts: Account[] = [];
-
-    for (const ga of guestAccounts) {
-      try {
-        const accountData = await api.accounts.get(ga.address);
-        if (accountData) syncedAccounts.push(accountData);
-      } catch {
-        // Account doesn't exist on server, try to recreate
-        try {
-          const newAccount = await api.accounts.create({
-            localPart: ga.localPart,
-            domain: ga.domain,
-          });
-          if (newAccount) syncedAccounts.push(newAccount);
-        } catch {
-          // Account creation failed, remove from localStorage
-          removeGuestAccount(ga.address);
-        }
-      }
-    }
-
-    if (syncedAccounts.length > 0 && !selectedAccount) {
-      onSelectAccount(syncedAccounts[0]);
-    }
-    setGuestLoading(false);
-  };
 
   // Update guest account lastUsed in localStorage
   const updateGuestAccountLastUsed = (address: string) => {
@@ -225,11 +205,15 @@ export default function Sidebar({
     const address = `${local}@${domain}`;
     setCreateLoading(true);
     try {
-      await onCreateAccount(address);
+      await onCreateAccount(address, captchaToken);
+      setCustomLocal('');
+      setCaptchaToken('');
+      setShowCreate(false);
+    } catch (err) {
+      setCaptchaToken('');
+      setCaptchaVersion(v => v + 1);
     } finally {
       setCreateLoading(false);
-      setCustomLocal('');
-      setShowCreate(false);
     }
   }
 
@@ -417,10 +401,24 @@ export default function Sidebar({
                 @{selectedDomain}
               </div>
             )}
+
+            {!user && captchaConfig?.enabled && captchaConfig?.siteKey && (
+              <div className="mb-2">
+                <Turnstile
+                  key={captchaVersion}
+                  siteKey={captchaConfig.siteKey}
+                  onVerify={(token: string) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken('')}
+                  onError={() => setCaptchaToken('')}
+                  theme={darkMode ? 'dark' : 'light'}
+                />
+              </div>
+            )}
+
             <button
               className="btn btn-primary w-full justify-center"
               onClick={handleCreate}
-              disabled={createLoading || !selectedDomain}
+              disabled={createLoading || !selectedDomain || !!(!user && captchaConfig?.enabled && captchaConfig?.siteKey && !captchaToken)}
             >
               {createLoading ? t('loading') : t('tao')}
             </button>

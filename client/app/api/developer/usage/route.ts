@@ -121,6 +121,35 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
+    // Query user's accounts list to fetch email stats
+    const { data: userAccounts } = await supabaseAdmin!
+      .from('accounts')
+      .select('id')
+      .eq('user_id', user.id);
+
+    const accountIds = (userAccounts || []).map((acc: any) => acc.id);
+
+    let emailsCount = 0;
+    let emailsToday = 0;
+
+    if (accountIds.length > 0) {
+      const [totalEmailsRes, todayEmailsRes] = await Promise.all([
+        supabaseAdmin!
+          .from('emails')
+          .select('id', { count: 'exact', head: true })
+          .in('account_id', accountIds)
+          .eq('is_deleted', false),
+        supabaseAdmin!
+          .from('emails')
+          .select('id', { count: 'exact', head: true })
+          .in('account_id', accountIds)
+          .eq('is_deleted', false)
+          .gte('received_at', startOfDay)
+      ]);
+      emailsCount = totalEmailsRes.count || 0;
+      emailsToday = todayEmailsRes.count || 0;
+    }
+
     return NextResponse.json({
       apiKeys: {
         total: apiKeysCount || 0,
@@ -140,6 +169,10 @@ export async function GET(request: NextRequest) {
       },
       accounts: {
         total: accountsCount || 0,
+      },
+      emails: {
+        total: emailsCount,
+        today: emailsToday,
       },
     });
   } catch (err) {

@@ -179,6 +179,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Broadcast new email via Supabase Realtime Broadcast
+    // This bypasses postgres_changes (which requires RLS evaluation on WAL)
+    // and delivers notifications directly to connected clients
+    try {
+      const broadcastChannel = supabaseAdmin!.channel('email-notifications');
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          supabaseAdmin!.removeChannel(broadcastChannel);
+          resolve();
+        }, 3000);
+
+        broadcastChannel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await broadcastChannel.send({
+              type: 'broadcast',
+              event: 'new-email',
+              payload: {
+                // SECURITY: Only broadcast minimal notification data.
+                // Full email content is fetched via authenticated API with RLS.
+                id: email.id,
+                account_id: existingAccount.id,
+                from_address: email.from_address,
+                from_name: email.from_name || '',
+                to_address: email.to_address,
+                subject: email.subject,
+                received_at: email.received_at,
+              },
+            });
+            clearTimeout(timeout);
+            supabaseAdmin!.removeChannel(broadcastChannel);
+            resolve();
+          }
+        });
+      });
+      console.log(`[Webhook] Broadcast sent for email ${email.id}`);
+    } catch (broadcastErr) {
+      console.warn('[Webhook] Broadcast failed (non-critical):', broadcastErr);
+    }
+
     console.log(`[Webhook] Email saved: from=${parsed.from} to=${parsed.to} subject=${parsed.subject}`);
     return NextResponse.json({ message: 'OK', emailId: email.id });
   } catch (err) {

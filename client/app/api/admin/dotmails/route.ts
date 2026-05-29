@@ -20,7 +20,7 @@ try {
   // imapflow/mailparser not available in this environment
 }
 
-async function requireAdmin(request: NextRequest) {
+async function requireAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { error: 'No token provided', status: 401 };
@@ -37,9 +37,6 @@ async function requireAdmin(request: NextRequest) {
   if (!profile.is_active) {
     return { error: 'Account is disabled', status: 403 };
   }
-  if (profile.role !== 'admin') {
-    return { error: 'Admin access required', status: 403 };
-  }
   return { user: { ...decoded, ...profile } };
 }
 
@@ -55,16 +52,67 @@ function stripHtml(html: string): string {
 }
 
 function extractOTP(text: string): string | null {
-  // Support 4-8 digit OTP codes from any service
-  const patterns = [
-    /(?:verification|verify|code|mã|xác minh|xác nhận|confirm)[^\d]{0,30}(\d{4,8})/i,
-    /(\d{4,8})[^\d]{0,30}(?:verification|verify|code|mã|xác minh)/i,
-    /\b(\d{6})\b/,
-  ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return m[1];
+  if (!text) return null;
+
+  // Clean URLs, email addresses, and markdown link formats to avoid matching random tokens inside URLs/headers
+  let content = text.replace(/https?:\/\/[^\s\]\)]+/gi, ' ');
+  content = content.replace(/\[([^\]]*)\]\([^\)]*\)/g, ' $1 '); // convert [text](url) to text
+  content = content.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, ' '); // remove emails
+
+  // Normalize all unicode hyphens/dashes (like non-breaking hyphen, en-dash, em-dash) to standard ASCII hyphen
+  content = content.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212–—]/g, '-');
+
+  // 1. Check for alphanumeric codes with a hyphen (e.g. F2P-6WP, CJN-I33, BWC-JRX)
+  const hyphenMatch = content.match(/\b([A-Z0-9]{2,5}-[A-Z0-9]{2,5})\b/i);
+  if (hyphenMatch) {
+    const code = hyphenMatch[1].toUpperCase();
+    const exclusions = ['OPT-IN', 'OPT-OUT', 'ADD-ON', 'PRE-AMP', 'E-MAIL', 'X-AI'];
+    if (code.length >= 5 && code.length <= 11 && !exclusions.includes(code)) {
+      return code;
+    }
   }
+
+  // 2. Pure digits of length 6 (highest priority standard numeric OTP)
+  const sixDigitMatch = content.match(/\b(\d{6})\b/);
+  if (sixDigitMatch) {
+    return sixDigitMatch[1];
+  }
+
+  // 3. Pure digits of length 4 to 8
+  const digitsMatch = content.match(/\b(\d{4,8})\b/);
+  if (digitsMatch) {
+    const code = digitsMatch[1];
+    // Exclude years (2024-2030) to avoid false positive matching with copyright year
+    if (!(code.length === 4 && /^202[4-9]|2030$/.test(code))) {
+      return code;
+    }
+  }
+
+  // 4. Context-based alphanumeric code matching (e.g. code: A1B2, verification: 4910)
+  const contextPatterns = [
+    /(?:code|mã|otp|verification|xác\s*minh|confirm|security)[:\s]+([A-Z0-9-]{4,8})/i,
+    /([A-Z0-9-]{4,8})[:\s]+(?:is\s+your\s+code|là\s+mã\s+xác\s+minh)/i
+  ];
+  for (const pattern of contextPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      const code = match[1];
+      if (code && code.length >= 4 && code.length <= 8 && /[0-9]/.test(code)) {
+        return code.toUpperCase();
+      }
+    }
+  }
+
+  // 5. Alphanumeric of length 4 to 8 containing both letters and digits (e.g. A1B2C3, GROK12)
+  const alphaNumMatch = content.match(/\b([A-Z0-9]{4,8})\b/i);
+  if (alphaNumMatch) {
+    const code = alphaNumMatch[1];
+    // Must contain both letters and digits to be classified as an OTP (prevent matching words like 'EMAIL')
+    if (/[A-Z]/i.test(code) && /[0-9]/.test(code)) {
+      return code.toUpperCase();
+    }
+  }
+
   return null;
 }
 
@@ -96,7 +144,7 @@ function normalizeDotmail(email: string): string {
 // ============================================
 // IMAP OTP Fetcher
 // ============================================
-async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotmailAddress: string): Promise<{ otp: string | null; from: string; subject: string }> {
+async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotmailAddress: string): Promise<{ emails: any[] }> {
   // Dynamic require to avoid webpack bundling these Node.js-only modules
   if (!ImapFlowModule || !mailparserModule) {
     throw new Error('IMAP modules not available in this environment');
@@ -122,7 +170,7 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
 
       let messages;
       if (totalMessages > 0) {
-        const startSeq = Math.max(1, totalMessages - 20 + 1);
+        const startSeq = Math.max(1, totalMessages - 50 + 1);
         messages = client.fetch(
           `${startSeq}:${totalMessages}`,
           { source: true, uid: true, envelope: true }
@@ -154,14 +202,25 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
           };
 
           const targetEmail = dotmailAddress.toLowerCase().trim();
+          const cleanParent = parentEmail.toLowerCase().trim();
           const recipientEmails = [...extractEmails(toText), ...extractEmails(ccText)];
-          const isTargetDotmail = recipientEmails.includes(targetEmail);
+          
+          let isTargetDotmail = false;
+          if (targetEmail === cleanParent) {
+            // Mail cha có thể xem email của chính nó và toàn bộ các mail con (dotmail)
+            const normalizedTarget = normalizeDotmail(targetEmail);
+            isTargetDotmail = recipientEmails.some(rec => normalizeDotmail(rec) === normalizedTarget);
+          } else {
+            // Mail con chỉ được phép xem email gửi chính xác đến địa chỉ của nó
+            isTargetDotmail = recipientEmails.includes(targetEmail);
+          }
           
           console.log('[Dotmail OTP] Checking email:', {
             subject: parsed.subject,
             toHeader: toText.trim(),
             ccHeader: ccText.trim(),
             targetEmail,
+            parentEmail: cleanParent,
             recipientEmails,
             isTargetDotmail
           });
@@ -174,24 +233,26 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
           const combinedText = `${parsed.subject || ''}\n${textContent}\n${strippedHtml}`;
           const otp = extractOTP(combinedText);
 
-          if (otp) {
-            emails.push({
-              otp,
-              from: parsed.from?.text || '',
-              subject: parsed.subject || '',
-              date: emailDate,
-            });
-          }
+          const fromName = parsed.from?.value?.[0]?.name || '';
+          const fromAddress = parsed.from?.value?.[0]?.address || parsed.from?.text || '';
+
+          emails.push({
+            id: msg.uid.toString(),
+            otp: otp || null,
+            from: fromAddress,
+            fromName: fromName,
+            subject: parsed.subject || '',
+            body: textContent,
+            html: htmlContent || textContent,
+            date: emailDate.toISOString(),
+          });
         } catch { /* skip unparseable */ }
       }
 
       // Sort newest first
-      emails.sort((a, b) => b.date.getTime() - a.date.getTime());
+      emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      if (emails.length > 0) {
-        return { otp: emails[0].otp, from: emails[0].from, subject: emails[0].subject };
-      }
-      return { otp: null, from: '', subject: '' };
+      return { emails };
     } finally {
       lock.release();
     }
@@ -207,13 +268,14 @@ async function fetchOTPFromGmail(parentEmail: string, appPassword: string, dotma
 // GET Handler
 // ============================================
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
+  const user = auth.user!;
 
   try {
     // --- Fetch OTP for a dotmail ---
@@ -227,12 +289,17 @@ export async function GET(request: NextRequest) {
       const normalized = normalizeDotmail(address);
       const { data: parent } = await supabaseAdmin!
         .from('gmail_parents')
-        .select('address, app_password')
+        .select('address, app_password, user_id')
         .eq('address', normalized)
         .maybeSingle();
 
       if (!parent) {
         return NextResponse.json({ error: 'Parent Gmail not found for this dotmail' }, { status: 404 });
+      }
+
+      // Check ownership
+      if (parent.user_id && parent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
 
       try {
@@ -244,13 +311,20 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Default: List all parents with nested dotmails ---
-    const { data: parents, error: pErr } = await supabaseAdmin!
-      .from('gmail_parents')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query = supabaseAdmin!.from('gmail_parents').select('*');
+    if (user.role !== 'admin') {
+      query = query.eq('user_id', user.id);
+    }
+    const { data: parents, error: pErr } = await query.order('created_at', { ascending: false });
 
     if (pErr) {
-      return NextResponse.json({ error: 'Failed to fetch parents' }, { status: 500 });
+      console.error('[Dotmail] pErr:', pErr);
+      if (pErr.message?.includes('user_id') || pErr.code === '42703') {
+        return NextResponse.json({ 
+          error: 'Vui lòng chạy file di trú `supabase/user_dotmail_migration.sql` trong SQL Editor của Supabase để thêm cột `user_id` vào bảng `gmail_parents`.' 
+        }, { status: 500 });
+      }
+      return NextResponse.json({ error: 'Failed to fetch parents', details: pErr }, { status: 500 });
     }
 
     const result = [];
@@ -275,14 +349,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ============================================
-// POST Handler
-// ============================================
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+
+  const user = auth.user!;
 
   try {
     const body = await request.json();
@@ -298,12 +371,27 @@ export async function POST(request: NextRequest) {
       const [localPart, domainPart] = address.toLowerCase().split('@');
       const cleanAddress = `${localPart.replace(/\./g, '')}@${domainPart || 'gmail.com'}`;
 
+      // Prevent regular users from hijacking or overwriting others' or admin's Gmail parents
+      const { data: existingParent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('user_id')
+        .eq('address', cleanAddress)
+        .maybeSingle();
+
+      if (existingParent && existingParent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Địa chỉ Gmail này đã được đăng ký bởi người dùng khác' }, { status: 403 });
+      }
+
       // Encrypt app password before storing
       const encryptedPassword = encrypt(app_password);
 
       const { data, error } = await supabaseAdmin!
         .from('gmail_parents')
-        .upsert({ address: cleanAddress, app_password: encryptedPassword }, { onConflict: 'address' })
+        .upsert({ 
+          address: cleanAddress, 
+          app_password: encryptedPassword,
+          user_id: user.id
+        }, { onConflict: 'address' })
         .select()
         .single();
 
@@ -317,6 +405,17 @@ export async function POST(request: NextRequest) {
     if (action === 'delete-parent') {
       const { id } = body;
       if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+      // Verify ownership
+      const { data: parent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('user_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (!parent) return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      if (parent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
 
       const { error } = await supabaseAdmin!
         .from('gmail_parents')
@@ -334,6 +433,17 @@ export async function POST(request: NextRequest) {
       const { id, app_password } = body;
       if (!id || !app_password) {
         return NextResponse.json({ error: 'id and app_password are required' }, { status: 400 });
+      }
+
+      // Verify ownership
+      const { data: parent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('user_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (!parent) return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      if (parent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
 
       // Encrypt app password before updating
@@ -359,12 +469,15 @@ export async function POST(request: NextRequest) {
 
       const { data: parent } = await supabaseAdmin!
         .from('gmail_parents')
-        .select('address, app_password')
+        .select('address, app_password, user_id')
         .eq('id', id)
         .single();
 
       if (!parent) {
         return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      }
+      if (parent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
 
       if (!ImapFlowModule) {
@@ -396,12 +509,15 @@ export async function POST(request: NextRequest) {
 
       const { data: parent } = await supabaseAdmin!
         .from('gmail_parents')
-        .select('address')
+        .select('address, user_id')
         .eq('id', parent_id)
         .single();
 
       if (!parent) {
         return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      }
+      if (parent.user_id !== user.id && user.role !== 'admin') {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
 
       const variants = [parent.address, ...generateSingleDotVariants(parent.address)];
@@ -428,6 +544,27 @@ export async function POST(request: NextRequest) {
     if (action === 'delete-dotmail') {
       const { id } = body;
       if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+      // Verify ownership of the dotmail
+      const { data: dotmail } = await supabaseAdmin!
+        .from('gmail_dotmails')
+        .select('parent_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!dotmail) {
+        return NextResponse.json({ error: 'Dotmail not found' }, { status: 404 });
+      }
+
+      const { data: parent } = await supabaseAdmin!
+        .from('gmail_parents')
+        .select('user_id')
+        .eq('id', dotmail.parent_id)
+        .maybeSingle();
+
+      if (!parent || (parent.user_id !== user.id && user.role !== 'admin')) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
 
       const { error } = await supabaseAdmin!
         .from('gmail_dotmails')

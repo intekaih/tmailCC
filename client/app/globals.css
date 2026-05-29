@@ -2,87 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hallmark · Motion Guidelines Applied */
+/* Variables */
 :root {
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-micro: 120ms;
-  --dur-short: 220ms;
-  --dur-long: 420ms;
+  --dur-micro: 50ms;
+  --dur-short: 100ms;
+  --dur-long: 200ms;
   --sidebar-width: 280px;
   --list-width: 380px;
   
-  --font-display: var(--font-playfair-display), var(--font-shippori-mincho), var(--font-cinzel), serif;
-  --font-ui: var(--font-noto-serif-jp), var(--font-plus-jakarta-sans), serif;
-  --font-body: var(--font-plus-jakarta-sans), sans-serif;
+  --font-display: var(--font-playfair-display), Georgia, serif;
+  --font-body: var(--font-source-serif), Georgia, serif;
+  --font-ui: var(--font-source-serif), Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+
+  /* Colors - Strictly Monochrome */
+  --bg-primary: #FFFFFF;      /* Pure white */
+  --bg-secondary: #F5F5F5;    /* Off-white */
+  --bg-tertiary: #E5E5E5;     /* Light gray */
+  --bg-hover: #E5E5E5;        /* Light gray on hover */
+  --text-primary: #000000;    /* Pure black */
+  --text-secondary: #525252;  /* Dark gray */
+  --text-muted: #737373;      /* Muted gray */
+  
+  --accent: #000000;          /* Black IS the accent */
+  --accent-hover: #000000;
+  --accent-subtle: rgba(0, 0, 0, 0.04);
+  
+  --border: #000000;          /* Sharp black borders */
+  --border-light: #E5E5E5;    /* Light gray dividers */
+  
+  --success: #000000;
+  --warning: #525252;
+  --error: #000000;
+  
+  --unread-dot: #000000;
+  --star-color: #000000;
+  --shadow: none;
+
+  /* No noise background patterns */
+  --wave-pattern: none;
 }
 
 @layer base {
   :root {
-    --bg-primary: #060d17;
-    --bg-secondary: #0c1523;
-    --bg-tertiary: #132238;
-    --bg-hover: #1c3352;
-    --text-primary: #ffffff;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --accent: #d9a752;
-    --accent-hover: #f0c273;
-    --accent-subtle: rgba(217, 167, 82, 0.12);
-    --border: #1e3556;
-    --border-light: #2e4f7e;
-    --success: #4ca374;
-    --warning: #d9a752;
-    --error: #d4554c;
-    --unread-dot: #d9a752;
-    --star-color: #f0c273;
-    --shadow: rgba(0, 0, 0, 0.6);
-    --wave-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'%3E%3Cpath d='M0 40c0-11 9-20 20-20s20 9 20 20M40 40c0-11 9-20 20-20s20 9 20 20M0 40c0-5.5 4.5-10 10-10s10 4.5 10 10M40 40c0-5.5 4.5-10 10-10s10 4.5 10 10M20 20c0-11 9-20 20-20s20 9 20 20M20 20c0-5.5 4.5-10 10-10s10 4.5 10 10' fill='none' stroke='%231c3352' stroke-width='1.2' stroke-opacity='0.45'/%3E%3C/svg%3E");
-  }
-
-  html[data-theme="dark"] {
-    --bg-primary: #060d17;
-    --bg-secondary: #0c1523;
-    --bg-tertiary: #132238;
-    --bg-hover: #1c3352;
-    --text-primary: #ffffff;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --accent: #d9a752;
-    --accent-hover: #f0c273;
-    --accent-subtle: rgba(217, 167, 82, 0.12);
-    --border: #1e3556;
-    --border-light: #2e4f7e;
-    --success: #4ca374;
-    --warning: #d9a752;
-    --error: #d4554c;
-    --unread-dot: #d9a752;
-    --star-color: #f0c273;
-    --shadow: rgba(0, 0, 0, 0.6);
-    --wave-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'%3E%3Cpath d='M0 40c0-11 9-20 20-20s20 9 20 20M40 40c0-11 9-20 20-20s20 9 20 20M0 40c0-5.5 4.5-10 10-10s10 4.5 10 10M40 40c0-5.5 4.5-10 10-10s10 4.5 10 10M20 20c0-11 9-20 20-20s20 9 20 20M20 20c0-5.5 4.5-10 10-10s10 4.5 10 10' fill='none' stroke='%231c3352' stroke-width='1.2' stroke-opacity='0.45'/%3E%3C/svg%3E");
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
 
   html[data-theme="light"] {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f0f4f8;
-    --bg-tertiary: #e1e7f0;
-    --bg-hover: #d5dee9;
-    --text-primary: #040810;
-    --text-secondary: #1e293b;
-    --text-muted: #475569;
-    --accent: #1c6ca1;
-    --accent-hover: #135078;
-    --accent-subtle: rgba(28, 108, 161, 0.1);
-    --border: #cfdae7;
-    --border-light: #b3c5da;
-    --success: #257a4e;
-    --warning: #d9a752;
-    --error: #b83b32;
-    --unread-dot: #1c6ca1;
-    --star-color: #d9a752;
-    --shadow: rgba(28, 66, 96, 0.08);
-    --wave-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'%3E%3Cpath d='M0 40c0-11 9-20 20-20s20 9 20 20M40 40c0-11 9-20 20-20s20 9 20 20M0 40c0-5.5 4.5-10 10-10s10 4.5 10 10M40 40c0-5.5 4.5-10 10-10s10 4.5 10 10M20 20c0-11 9-20 20-20s20 9 20 20M20 20c0-5.5 4.5-10 10-10s10 4.5 10 10' fill='none' stroke='%23cfdae7' stroke-width='1.2' stroke-opacity='0.4'/%3E%3C/svg%3E");
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F5F5F5;
+    --bg-tertiary: #E5E5E5;
+    --bg-hover: #E5E5E5;
+    --text-primary: #000000;
+    --text-secondary: #525252;
+    --text-muted: #737373;
+    --accent: #000000;
+    --accent-hover: #000000;
+    --accent-subtle: rgba(0, 0, 0, 0.04);
+    --border: #000000;
+    --border-light: #E5E5E5;
+    --success: #000000;
+    --warning: #525252;
+    --error: #000000;
+    --unread-dot: #000000;
+    --star-color: #000000;
+    --shadow: none;
+  }
+
+  html[data-theme="dark"] {
+    --bg-primary: #000000;
+    --bg-secondary: #0d0d0d;
+    --bg-tertiary: #161616;
+    --bg-hover: #1f1f1f;
+    --text-primary: #FFFFFF;
+    --text-secondary: #e5e5e5;
+    --text-muted: #a3a3a3;
+    --accent: #F4ABB4;
+    --accent-hover: #ffc2cc;
+    --accent-subtle: rgba(244, 171, 180, 0.15);
+    --border: #F4ABB4;
+    --border-light: #262626;
+    --success: #F4ABB4;
+    --warning: #e5e5e5;
+    --error: #FF3366;
+    --unread-dot: #F4ABB4;
+    --star-color: #F4ABB4;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   }
 
   * {
@@ -90,20 +99,23 @@
   }
 
   body {
-    @apply h-screen overflow-hidden transition-colors duration-200;
-    font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    @apply transition-colors duration-150;
+    font-family: var(--font-body), Georgia, serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.625;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-image: var(--wave-pattern);
+    background-size: auto, 100% 4px;
   }
 
   h1, h2, h3, .modal-title, .sidebar-header span, .topbar-left span, .email-list-header h2 {
-    font-family: var(--font-display), 'Cinzel', serif;
-    letter-spacing: 0.03em;
+    font-family: var(--font-display), Georgia, serif;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.025em;
   }
 
   ::-webkit-scrollbar {
@@ -115,12 +127,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded;
-    background-color: var(--border-light);
+    background-color: var(--border);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--text-muted);
+    background-color: var(--text-secondary);
   }
 }
 
@@ -133,143 +144,150 @@
   }
 
   .btn {
-    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-none cursor-pointer text-sm font-medium transition-all duration-150;
-    font-family: var(--font-body), sans-serif;
+    @apply inline-flex items-center gap-1.5 px-6 py-3 cursor-pointer text-xs font-mono uppercase tracking-widest transition-colors duration-100 ease-out;
+    border-radius: 0px !important;
+    clip-path: none !important;
+    border: 1px solid var(--border);
   }
 
   .btn-primary {
-    @apply bg-[var(--accent)] text-[var(--bg-primary)] font-semibold;
+    @apply border-transparent font-medium;
+    background-color: var(--accent);
+    color: var(--bg-primary);
   }
 
   .btn-primary:hover {
-    @apply bg-[var(--accent-hover)];
+    background-color: var(--bg-primary);
+    color: var(--accent);
+    border-color: var(--border);
   }
 
   .btn-secondary {
-    @apply bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border)];
+    @apply font-medium;
+    background-color: transparent;
+    color: var(--text-primary);
+    border-color: var(--border);
   }
 
   .btn-secondary:hover {
-    @apply bg-[var(--bg-hover)];
+    background-color: var(--accent);
+    color: var(--bg-primary);
+    border-color: transparent;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-[var(--text-secondary)] px-3 py-1.5;
+    @apply bg-transparent text-[var(--text-secondary)] border-transparent px-3 py-1.5;
   }
 
   .btn-ghost:hover {
-    @apply bg-[var(--bg-hover)] text-[var(--text-primary)];
+    @apply underline;
+    color: var(--text-primary);
   }
 
   .btn-danger {
-    @apply bg-red-500/15 text-[var(--error)];
+    @apply border;
+    background-color: transparent;
+    color: var(--text-primary);
+    border-color: var(--border);
   }
 
   .btn-danger:hover {
-    @apply bg-red-500/25;
+    background-color: var(--text-primary);
+    color: var(--bg-primary);
+    border-color: transparent;
   }
 
   .input {
-    @apply w-full px-3.5 py-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] transition-colors duration-150 outline-none;
-    font-family: var(--font-body), sans-serif;
+    @apply w-full px-4 py-3 text-sm transition-all duration-100 outline-none;
+    font-family: var(--font-mono), monospace;
+    border-radius: 0px !important;
+    clip-path: none !important;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
   }
 
   .input:focus {
-    @apply border-[var(--accent)];
+    border-color: var(--border);
+    border-bottom-width: 3px;
   }
 
   .input::placeholder {
-    @apply text-[var(--text-muted)];
+    @apply text-[var(--text-muted)] italic opacity-60;
   }
 
   .select {
-    @apply px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] cursor-pointer outline-none;
-    font-family: var(--font-body), sans-serif;
+    @apply px-4 py-2.5 cursor-pointer outline-none;
+    font-family: var(--font-body), Georgia, serif;
+    border-radius: 0px !important;
+    clip-path: none !important;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
   }
 
   .select:focus {
-    @apply border-[var(--accent)];
+    border-color: var(--border);
+    border-bottom-width: 3px;
   }
 
   .loading-spinner {
-    @apply w-5 h-5 border-2 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin;
+    @apply w-5 h-5 border border-t-transparent rounded-none animate-spin;
+    border-color: var(--text-primary);
+    border-top-color: transparent;
   }
 
   .fade-in {
-    @apply animate-[fadeIn_0.2s_ease-out];
+    @apply animate-[fadeIn_0.1s_ease-out];
   }
 
   @keyframes fadeIn {
     from {
-      @apply opacity-0 translate-y-1;
+      @apply opacity-0;
     }
     to {
-      @apply opacity-100 translate-y-0;
+      @apply opacity-100;
     }
   }
 
   .unread-dot {
-    @apply w-2 h-2 rounded-full flex-shrink-0;
+    @apply w-2.5 h-2.5 rounded-none flex-shrink-0;
     background-color: var(--unread-dot);
   }
 
   .modal-overlay {
     @apply fixed inset-0 flex items-center justify-center z-[1000];
-    background-color: rgba(6, 13, 23, 0.75);
-    backdrop-filter: blur(12px);
-    transition: all 0.3s ease;
+    background-color: rgba(0, 0, 0, 0.4);
+    transition: all 0.1s ease;
   }
 
   .modal {
-    @apply rounded-2xl p-6 max-w-md w-[90%] max-h-[90vh] overflow-y-auto;
-    background: linear-gradient(135deg, #0a1424 0%, #050a12 100%);
-    border: 1px solid rgba(197, 160, 89, 0.15);
-    box-shadow: 0 25px 80px -10px rgba(0, 0, 0, 0.6), 0 0 40px rgba(197, 160, 89, 0.04);
+    @apply p-8 max-w-md w-[90%] max-h-[90vh] overflow-y-auto;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 0px !important;
+    clip-path: none !important;
     position: relative;
     overflow: hidden;
   }
 
-  .modal::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 60px;
-    opacity: 0.04;
-    background-image: var(--wave-pattern);
-    background-size: 80px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .modal > * {
-    position: relative;
-    z-index: 1;
-  }
-
   .modal-header {
     @apply flex items-center justify-between mb-5 pb-3;
-    border-bottom: 1px solid rgba(197, 160, 89, 0.1);
+    border-bottom: 2px solid var(--border);
   }
 
   .modal-title {
-    @apply text-xl font-bold;
-    font-family: var(--font-display), 'Playfair Display', 'Noto Serif JP', Georgia, serif;
-    background: linear-gradient(to right, #ffffff 0%, #d8c29d 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: 0.03em;
+    @apply text-base font-bold tracking-widest;
+    font-family: var(--font-display), Georgia, serif;
+    color: var(--text-primary);
   }
 
   .modal-close {
-    @apply w-8 h-8 rounded-lg border-none bg-transparent cursor-pointer flex items-center justify-center text-[var(--text-muted)] transition-all duration-200;
+    @apply w-8 h-8 rounded-none border-none bg-transparent cursor-pointer flex items-center justify-center text-[var(--text-muted)] transition-all duration-100;
   }
 
   .modal-close:hover {
-    @apply text-[var(--accent)];
-    background-color: rgba(197, 160, 89, 0.08);
-    transform: rotate(90deg);
+    @apply text-[var(--text-primary)] bg-[var(--bg-hover)];
   }
 
   .form-group {
@@ -277,27 +295,12 @@
   }
 
   .form-label {
-    @apply block text-sm font-medium text-[var(--text-secondary)] mb-1.5;
+    @apply block text-xs font-mono uppercase tracking-widest text-[var(--text-secondary)] mb-1.5;
   }
 
   .form-error {
-    @apply text-xs text-[var(--error)] mt-1;
-  }
-
-  html[data-theme="light"] .modal {
-    background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
-    border: 1px solid rgba(28, 108, 161, 0.15);
-    box-shadow: 0 25px 80px -10px rgba(0, 0, 0, 0.1), 0 0 40px rgba(28, 108, 161, 0.02);
-  }
-
-  html[data-theme="light"] .modal-header {
-    border-bottom-color: rgba(28, 108, 161, 0.15);
-  }
-
-  html[data-theme="light"] .modal-title {
-    background: linear-gradient(to right, #040810 0%, #1c6ca1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    @apply text-xs mt-1 font-mono font-bold;
+    color: var(--text-primary);
   }
 }
 
