@@ -1,0 +1,11 @@
+{
+  "name": "gpt-reg-demo",
+  "version": "1.0.0",
+  "description": "GPT auto-registration demo tool using tmailCC Developer API",
+  "description_vi": "Cong cu demo dang ky GPT tu dong dung tmailCC Developer API",
+  "private": true,
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "readme": "Chay truc tiep bang cach mo index.html trong trinh duyet, hoac su dung `npx serve .` de phuc vu qua http."
+}

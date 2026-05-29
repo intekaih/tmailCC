@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tmailCC Demo - GPT Registration Automation</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR: API Flow Diagram -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="#6366f1"/>
+          <path d="M7 9h14M7 14h9M7 19h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>tmailCC API</span>
+      </div>
+      <div class="api-status" id="apiStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Chua ket noi</span>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+      <h3>API Flow</h3>
+      <div class="flow-steps">
+        <div class="flow-step" id="flow-1">
+          <div class="flow-num">1</div>
+          <div class="flow-info">
+            <div class="flow-title">Ket noi API</div>
+            <div class="flow-method">GET /api/v1/domains</div>
+          </div>
+          <div class="flow-check"></div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step" id="flow-2">
+          <div class="flow-num">2</div>
+          <div class="flow-info">
+            <div class="flow-title">Tao tai khoan</div>
+            <div class="flow-method">POST /api/v1/accounts</div>
+          </div>
+          <div class="flow-check"></div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step" id="flow-3">
+          <div class="flow-num">3</div>
+          <div class="flow-info">
+            <div class="flow-title">Lay email</div>
+            <div class="flow-method">GET /api/v1/accounts/:addr/emails</div>
+          </div>
+          <div class="flow-check"></div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step" id="flow-4">
+          <div class="flow-num">4</div>
+          <div class="flow-info">
+            <div class="flow-title">Cho OTP</div>
+            <div class="flow-method">GET /api/v1/accounts/:addr/wait-otp</div>
+          </div>
+          <div class="flow-check"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-log">
+      <h3>API Log <button id="clearLog" class="btn-small">Xoa</button></h3>
+      <div class="log-container" id="logContainer">
+        <div class="log-empty">Chua co request nao</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- STEP 1: CONFIGURATION -->
+    <section class="step-section" id="section-config">
+      <div class="section-header">
+        <div class="step-badge">Buoc 1</div>
+        <h2>Cau hinh ket noi</h2>
+        <p>Nhap thong tin API cua tmailCC de bat dau</p>
+      </div>
+
+      <div class="config-grid">
+        <div class="config-card">
+          <div class="config-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+          </div>
+          <div class="config-label">API URL</div>
+          <input type="text" id="apiUrl" class="config-input"
+            placeholder="http://localhost:3000"
+            value="http://localhost:3000">
+          <div class="config-hint">Dia chi server tmailCC</div>
+        </div>
+
+        <div class="config-card">
+          <div class="config-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+          </div>
+          <div class="config-label">API Key</div>
+          <input type="password" id="apiKey" class="config-input" placeholder="tmail_xxxxxxxxxxxx...">
+          <div class="config-hint">API key tu trang Developer Settings</div>
+        </div>
+
+        <div class="config-card">
+          <div class="config-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+          </div>
+          <div class="config-label">Domain</div>
+          <select id="domainSelect" class="config-input">
+            <option value="">-- Chon domain --</option>
+          </select>
+          <button id="refreshDomains" class="btn-small mt-8">Tai lai domains</button>
+          <div class="config-hint">Domain de tao tai khoan email</div>
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button id="btnTestConnection" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          Kiem tra ket noi
+        </button>
+        <button id="btnNextStep2" class="btn btn-success" disabled>
+          Tao tai khoan
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 2: CREATE ACCOUNT -->
+    <section class="step-section hidden" id="section-account">
+      <div class="section-header">
+        <div class="step-badge">Buoc 2</div>
+        <h2>Tao tai khoan email</h2>
+        <p>Tao dia chi email tam thoi de nhan email va ma xac minh</p>
+      </div>
+
+      <div class="account-display">
+        <div class="email-preview">
+          <div class="email-at-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <div class="email-address" id="emailAddress">---</div>
+          <button id="copyEmail" class="btn-copy" title="Copy dia chi">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <div class="email-hint">Su dung dia chi nay de dang ky ChatGPT, Google, hoac bat ky dich vu nao</div>
+        </div>
+
+        <div class="local-part-config">
+          <label>Dia chi email (tuy chon)</label>
+          <div class="local-input-row">
+            <input type="text" id="localPart" class="config-input" placeholder="random hoac ten ban">
+            <span class="at-suffix">@</span>
+            <span class="domain-display" id="domainDisplay">---</span>
+          </div>
+          <button id="btnCreateAccount" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Tao email moi
+          </button>
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button id="btnBack2" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Quay lai
+        </button>
+        <button id="btnNextStep3" class="btn btn-success" disabled>
+          Lang nghe email
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 3: EMAIL INBOX -->
+    <section class="step-section hidden" id="section-inbox">
+      <div class="section-header">
+        <div class="step-badge">Buoc 3</div>
+        <h2>Hop thu den</h2>
+        <p>Tat ca email nhan duoc tai dia chi nay se hien thi o day</p>
+      </div>
+
+      <div class="inbox-header">
+        <div class="inbox-email-tag">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <span id="inboxEmailAddress">---</span>
+          <button id="copyInboxEmail" class="btn-copy-sm" title="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        </div>
+        <div class="inbox-actions">
+          <label class="poll-toggle">
+            <input type="checkbox" id="autoPoll" checked>
+            <span>Tu dong quet</span>
+          </label>
+          <label class="poll-toggle">
+            <span>Khoang cach:</span>
+            <select id="pollInterval">
+              <option value="3">3s</option>
+              <option value="5">5s</option>
+              <option value="10">10s</option>
+            </select>
+          </label>
+          <button id="btnRefreshInbox" class="btn btn-outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Lam moi
+          </button>
+        </div>
+      </div>
+
+      <div class="email-list" id="emailList">
+        <div class="email-empty">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <p>Chua co email nao</p>
+          <span>Email den se hien thi o day sau khi ban su dung dia chi tren de dang ky dich vu</span>
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button id="btnBack3" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Quay lai
+        </button>
+        <button id="btnNextStep4" class="btn btn-warning" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Cho ma OTP
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 4: OTP WAITING -->
+    <section class="step-section hidden" id="section-otp">
+      <div class="section-header">
+        <div class="step-badge">Buoc 4</div>
+        <h2>Cho ma xac minh (OTP)</h2>
+        <p>Tu dong phat hien ma OTP trong email khi co mail xac minh tu dich vu (GPT, Google, ...)</p>
+      </div>
+
+      <div class="otp-display">
+        <div class="otp-card">
+          <div class="otp-status" id="otpStatus">
+            <div class="otp-pulse"></div>
+            <span>dang cho ma OTP...</span>
+          </div>
+          <div class="otp-codes" id="otpCodes">
+            <div class="otp-empty">Ma OTP se hien thi o day khi co email xac minh</div>
+          </div>
+          <div class="otp-stats">
+            <span id="otpWaitTime">0s</span>
+            <span id="otpEmailCount">0 email da kiem tra</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button id="btnBack4" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Quay lai
+        </button>
+        <button id="btnStartOtp" class="btn btn-warning">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Bat dau cho OTP
+        </button>
+        <button id="btnStopOtp" class="btn btn-danger hidden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="6" width="12" height="12"/>
+          </svg>
+          Dung lai
+        </button>
+        <button id="btnResetDemo" class="btn btn-success hidden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+          Bat dau lai
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 5: RESULT -->
+    <section class="step-section hidden" id="section-result">
+      <div class="section-header">
+        <div class="step-badge success">Hoan tat!</div>
+        <h2>Da tim thay ma OTP</h2>
+        <p>Su dung ma ben duoi de xac minh tai khoan dich vu</p>
+      </div>
+
+      <div class="result-display">
+        <div class="result-email">
+          <div class="result-label">Email su dung</div>
+          <div class="result-value" id="resultEmail">---</div>
+        </div>
+        <div class="result-code">
+          <div class="result-label">Ma xac minh (OTP)</div>
+          <div class="result-code-box" id="resultCode">---</div>
+          <button id="copyOtpCode" class="btn-copy-code">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy ma
+          </button>
+        </div>
+        <div class="result-meta" id="resultMeta"></div>
+      </div>
+
+      <div class="section-actions">
+        <button id="btnNewDemo" class="btn btn-success">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+          Demo moi
+        </button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Email Detail Modal -->
+<div class="modal-overlay hidden" id="emailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalSubject">Chi tiet email</h3>
+      <button id="closeModal" class="btn-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-meta">
+        <div><strong>Tu:</strong> <span id="modalFrom">---</span></div>
+        <div><strong>Thoi gian:</strong> <span id="modalTime">---</span></div>
+      </div>
+      <div class="modal-content" id="modalContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast hidden" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
