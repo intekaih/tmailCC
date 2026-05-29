@@ -61,7 +61,7 @@
 | 15 | AI Prompts Appendix | ✅ Đạt | docs/ai-prompts-appendix.md |
 | 16 | Responsive UI | ✅ Đạt | Mobile-first responsive |
 | 17 | GitHub Repository | ✅ Đạt | Commit history rõ ràng |
-| 18 | Production URL | ✅ Đạt | https://tmailcc.kaih.co.uk |
+| 18 | Production URL | ✅ Đạt | https://tmailcc.app |
 
 ---
 
@@ -588,7 +588,7 @@ docker build -t tmailcc .
 ## Liên hệ & Support
 
 - **GitHub Repository**: https://github.com/yourusername/tmailCC
-- **Production URL**: https://tmailcc.kaih.co.uk
+- **Production URL**: https://tmailcc.app
 - **Email**: your-email@example.com
 
 ## Kết luận & Hạn chế

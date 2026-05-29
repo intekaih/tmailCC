@@ -431,6 +431,7 @@ export async function updatePreferencesAction(
     darkMode?: boolean | null;
     soundEnabled?: boolean;
     notificationsEnabled?: boolean;
+    displayName?: string;
   }
 ): Promise<ActionResult> {
   try {
@@ -443,9 +444,22 @@ export async function updatePreferencesAction(
       return { success: false, error: 'Not authenticated' };
     }
 
+    // Fetch current preferences to merge
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('preferences')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const currentPreferences = profile?.preferences || {};
+    const updatedPreferences = {
+      ...currentPreferences,
+      ...preferences,
+    };
+
     const { error } = await supabaseAdmin
       .from('profiles')
-      .update({ preferences })
+      .update({ preferences: updatedPreferences })
       .eq('id', user.id);
 
     if (error) {

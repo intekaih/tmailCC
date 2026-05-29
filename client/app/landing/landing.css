@@ -215,7 +215,11 @@ html[data-theme="dark"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.api-console-header::-webkit-scrollbar { display: none; }
 
 .api-console-tab {
   color: var(--jp-cyan);
@@ -340,4 +344,123 @@ html[data-theme="dark"] {
   background: var(--jp-ocean);
   color: var(--jp-foam);
   font-weight: bold;
+}
+
+/* ==========================================================================
+   Scroll Reveal Animations & Dynamic Transitions
+   ========================================================================== */
+
+.scroll-reveal {
+  opacity: 0;
+  transition-property: opacity, transform;
+  transition-duration: 800ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); /* Premium Out-Expo curve */
+  will-change: transform, opacity;
+}
+
+.reveal-fade {
+  transform: none;
+}
+
+.reveal-slide-up {
+  transform: translateY(40px);
+}
+
+.reveal-slide-down {
+  transform: translateY(-40px);
+}
+
+.reveal-slide-left {
+  transform: translateX(40px);
+}
+
+.reveal-slide-right {
+  transform: translateX(-40px);
+}
+
+.reveal-scale-in {
+  transform: scale(0.95);
+}
+
+/* State when revealed by Intersection Observer */
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered Delay Utilities */
+.delay-100 { transition-delay: 100ms; }
+.delay-200 { transition-delay: 200ms; }
+.delay-300 { transition-delay: 300ms; }
+.delay-400 { transition-delay: 400ms; }
+.delay-500 { transition-delay: 500ms; }
+.delay-600 { transition-delay: 600ms; }
+.delay-700 { transition-delay: 700ms; }
+.delay-800 { transition-delay: 800ms; }
+
+/* Duration Utilities */
+.duration-300 { transition-duration: 300ms; }
+.duration-500 { transition-duration: 500ms; }
+.duration-800 { transition-duration: 800ms; }
+.duration-1000 { transition-duration: 1000ms; }
+.duration-1200 { transition-duration: 1200ms; }
+
+/* Pricing plans drawer smooth expand/collapse transition */
+.plans-drawer {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 1000ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.plans-drawer.open {
+  max-height: 1500px;
+  opacity: 1;
+}
+
+/* Staggered load for cards inside the drawer */
+.plans-drawer .plan-card {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: transform 850ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 850ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 100ms ease-out,
+              background-color 100ms ease-out;
+}
+
+.plans-drawer.open .plan-card {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.plans-drawer.open .plan-card:nth-child(1) { transition-delay: 150ms; }
+.plans-drawer.open .plan-card:nth-child(2) { transition-delay: 300ms; }
+.plans-drawer.open .plan-card:nth-child(3) { transition-delay: 450ms; }
+
+/* API Console Tab Indicator & Animations */
+.api-console-tab-indicator {
+  position: absolute;
+  bottom: -2px;
+  height: 2px;
+  background-color: var(--jp-border-gold);
+  transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1), width 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }

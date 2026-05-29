@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { parseEmail } from '@/lib/mailParser';
 import { triggerWebhooks } from '@/lib/services/webhookService';
-import { extractOtp } from '@/lib/services/otpUtils';
+import { extractAllOtps } from '@/lib/services/otpUtils';
 
 function isMissingColumn(error: any, columnName: string) {
   return error?.code === 'PGRST204' || error?.code === '42703' || String(error?.message || '').includes(columnName);
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
       // Check for OTP codes
       const combinedText = `${email.subject || ''}\n${email.text_content || ''}\n${email.html_content || ''}`;
-      const otpCodes = extractOtp(combinedText);
+      const otpCodes = extractAllOtps(combinedText);
 
       // Fire email.received webhook
       triggerWebhooks(existingAccount.user_id, 'email.received', {

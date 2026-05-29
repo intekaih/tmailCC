@@ -71,8 +71,8 @@ export default function QRModal({ address, onClose }: QRModalProps) {
             padding: 10px 16px;
             background: var(--bg-primary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Monaco', 'Menlo', monospace;
+            border-radius: 0px;
+            font-family: var(--font-mono), monospace;
             font-size: 14px;
             color: var(--accent);
             margin-bottom: 16px;
@@ -81,7 +81,7 @@ export default function QRModal({ address, onClose }: QRModalProps) {
           .qr-image {
             width: 256px;
             height: 256px;
-            border-radius: 12px;
+            border-radius: 0px;
             border: 1px solid var(--border);
             display: block;
             margin: 0 auto;

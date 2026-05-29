@@ -4,89 +4,18 @@
  */
 
 import { createClient } from './supabase/client';
+import type {
+  User,
+  Account,
+  Email,
+  Attachment,
+  Domain,
+  AccountsResponse,
+  EmailsResponse,
+} from './types';
 
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: 'user' | 'admin';
-  avatarUrl?: string | null;
-  emailCount?: number;
-  preferences?: {
-    darkMode: boolean | null;
-    soundEnabled: boolean;
-    notificationsEnabled: boolean;
-  };
-}
-
-export interface Account {
-  _id: string;
-  id: string;
-  address: string;
-  localPart: string;
-  domain: string;
-  user?: string;
-  owner?: {
-    id: string;
-    username: string;
-    role: 'user' | 'admin';
-  } | null;
-  createdAt: string;
-  lastActivity: string;
-  emailCount: number;
-  unreadCount?: number;
-  guestToken?: string;
-}
-
-export interface Email {
-  _id: string;
-  id: string;
-  account: string;
-  messageId: string;
-  from: string;
-  fromName: string;
-  to: string;
-  subject: string;
-  text: string;
-  html: string;
-  attachments: Attachment[];
-  receivedAt: string;
-  isRead: boolean;
-  isStarred: boolean;
-  isDeleted: boolean;
-}
-
-export interface Attachment {
-  filename: string;
-  contentType: string;
-  size: number;
-  contentId: string;
-  content?: string;
-}
-
-export interface Domain {
-  _id: string;
-  id: string;
-  domain: string;
-  label: string;
-  isActive: boolean;
-  isDefault: boolean;
-}
-
-export interface AccountsResponse {
-  accounts: Account[];
-  total: number;
-  skip: number;
-  limit: number;
-}
-
-export interface EmailsResponse {
-  emails: Email[];
-  total: number;
-  unreadCount: number;
-  skip: number;
-  limit: number;
-}
+// Re-export all types for backward compatibility
+export type { User, Account, Email, Attachment, Domain, AccountsResponse, EmailsResponse } from './types';
 
 // ============================================
 // Token Management
@@ -240,6 +169,12 @@ export const api = {
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
       request<{ message: string }>('/api/auth/change-password', {
         method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateProfile: (data: { displayName?: string }) =>
+      request<{ message: string; preferences: any }>('/api/auth/me', {
+        method: 'PATCH',
         body: JSON.stringify(data),
       }),
 
@@ -496,16 +431,24 @@ export const api = {
   developer: {
     // API Keys
     keys: {
-      list: () => request<{ keys: any[] }>('/api/developer/keys'),
+      list: () => request<any>('/api/developer/keys').then(res => res.data || { keys: [] }),
       create: (data: { name: string; scopes: string[]; expiresAt?: string }) =>
         request<any>('/api/developer/keys', {
           method: 'POST',
           body: JSON.stringify(data),
-        }),
+        }).then(res => res.data),
       revoke: (id: string) =>
-        request<{ message: string }>(`/api/developer/keys/${id}`, {
+        request<{ message: string }>(`/api/developer/keys/${id}?action=revoke`, {
           method: 'DELETE',
         }),
+      delete: (id: string) =>
+        request<{ message: string }>(`/api/developer/keys/${id}?action=delete`, {
+          method: 'DELETE',
+        }),
+      rotate: (id: string) =>
+        request<any>(`/api/developer/keys/${id}`, {
+          method: 'PATCH',
+        }).then(res => res.data),
     },
 
     // Webhooks

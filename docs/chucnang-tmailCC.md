@@ -1,7 +1,7 @@
 # Báo Cáo Chức Năng tmailCC
 
 > **Cập nhật:** 23/05/2026  
-> **Trạng thái:** Đang hoạt động tại https://tmailcc.kaih.co.uk/
+> **Trạng thái:** Đang hoạt động tại https://tmailcc.app/
 
 ---
 

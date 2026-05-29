@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getRateStore } from '@/lib/rateStore';
 import { decrypt, isEncrypted } from '@/lib/encryption';
+import { extractOtp } from '@/lib/services/otpUtils';
 
 // Static imports with graceful fallback for serverless environments
 let ImapFlowModule: any = null;
@@ -52,75 +53,6 @@ function verifyOtpKey(row: any, accessKey: string): boolean {
     }
   }
   return false;
-}
-
-function extractOTP(text: string | null): string | null {
-  if (!text) return null;
-
-  // 1. Decode common HTML entities
-  let cleanText = text.replace(/&#8209;|&#x2011;/g, '-');
-  cleanText = cleanText.replace(/&nbsp;|&#160;/g, ' ');
-  cleanText = cleanText.replace(/&amp;|&#38;/g, '&');
-
-  // 2. Clean URLs, email addresses, and markdown link formats to avoid matching random tokens inside URLs/headers
-  cleanText = cleanText.replace(/https?:\/\/[^\s\]\)]+/gi, ' ');
-  cleanText = cleanText.replace(/\[([^\]]*)\]\([^\)]*\)/g, ' $1 '); // convert [text](url) to text
-  cleanText = cleanText.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, ' '); // remove emails
-
-  // 3. Normalize all unicode hyphens/dashes to standard ASCII hyphen
-  cleanText = cleanText.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212–—]/g, '-');
-
-  // 4. Check for alphanumeric codes with a hyphen (e.g. F2P-6WP, CJN-I33, BWC-JRX)
-  const hyphenMatch = cleanText.match(/\b([A-Z0-9]{2,5}-[A-Z0-9]{2,5})\b/i);
-  if (hyphenMatch) {
-    const code = hyphenMatch[1].toUpperCase();
-    const exclusions = ['OPT-IN', 'OPT-OUT', 'ADD-ON', 'PRE-AMP', 'E-MAIL', 'X-AI'];
-    if (code.length >= 5 && code.length <= 11 && !exclusions.includes(code)) {
-      return code;
-    }
-  }
-
-  // 5. Pure digits of length 6 (highest priority standard numeric OTP)
-  const sixDigitMatch = cleanText.match(/\b(\d{6})\b/);
-  if (sixDigitMatch) {
-    return sixDigitMatch[1];
-  }
-
-  // 6. Pure digits of length 4 to 8 (excluding copyright years)
-  const digitsMatch = cleanText.match(/\b(\d{4,8})\b/);
-  if (digitsMatch) {
-    const code = digitsMatch[1];
-    // Exclude years (2024-2030) to avoid false positive matching with copyright year
-    if (!(code.length === 4 && /^202[4-9]|2030$/.test(code))) {
-      return code;
-    }
-  }
-
-  // 7. Context-based alphanumeric code matching (e.g. code: A1B2, verification: 4910)
-  const contextPatterns = [
-    /(?:code|mã|otp|verification|xác\s*minh|confirm|security)[:\s]+([A-Z0-9-]{4,8})/i,
-    /([A-Z0-9-]{4,8})[:\s]+(?:is\s+your\s+code|là\s+mã\s+xác\s+minh)/i
-  ];
-  for (const pattern of contextPatterns) {
-    const match = cleanText.match(pattern);
-    if (match) {
-      const code = match[1];
-      if (code && code.length >= 4 && code.length <= 8 && /[0-9]/.test(code)) {
-        return code.toUpperCase();
-      }
-    }
-  }
-
-  // 8. Alphanumeric of length 4 to 8 containing both letters and digits (e.g. A1B2C3, GROK12)
-  const alphaNumMatch = cleanText.match(/\b([A-Z0-9]{4,8})\b/i);
-  if (alphaNumMatch) {
-    const code = alphaNumMatch[1];
-    if (/[A-Z]/i.test(code) && /[0-9]/.test(code)) {
-      return code.toUpperCase();
-    }
-  }
-
-  return null;
 }
 
 function cleanCredential(text: string): string {
@@ -245,7 +177,7 @@ export async function POST(request: NextRequest) {
               const targetEmail = addressLower;
               const cleanParent = parent.address.toLowerCase().trim();
               const recipientEmails = [...extractEmails(toText), ...extractEmails(ccText)];
-              
+
               let isTargetDotmail = false;
               if (targetEmail === cleanParent) {
                 const normalizedTarget = normalizeDotmail(targetEmail);
@@ -260,7 +192,7 @@ export async function POST(request: NextRequest) {
               const htmlContent = parsed.html || '';
               const strippedHtml = htmlContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
               const combinedText = `${parsed.subject || ''}\n${textContent}\n${strippedHtml}`;
-              const otp = extractOTP(combinedText);
+              const otp = extractOtp(combinedText);
 
               emailsList.push({
                 id: String(msg.uid || emailDate.getTime()),
@@ -300,7 +232,7 @@ export async function POST(request: NextRequest) {
         from: e.from_name || e.from_address,
         subject: e.subject,
         preview: content.substring(0, 300).trim(),
-        code: extractOTP(content),
+        code: extractOtp(content),
         receivedAt: e.received_at,
       };
     });

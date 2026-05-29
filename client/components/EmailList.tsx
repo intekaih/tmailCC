@@ -12,6 +12,7 @@ interface EmailListProps {
   onSelectEmail: (email: Email) => void;
   onRefresh?: () => void;
   onClearAll?: () => void;
+  onMarkAllRead?: () => void;
   loading: boolean;
   account: Account | null;
 }
@@ -85,6 +86,7 @@ export default function EmailList({
   onSelectEmail,
   onRefresh,
   onClearAll,
+  onMarkAllRead,
   loading,
   account,
 }: EmailListProps) {
@@ -174,8 +176,8 @@ export default function EmailList({
     <div className="email-list flex flex-col h-screen overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-[var(--border)] flex-shrink-0">
-        {/* Top Row */}
-        <div className="flex items-center justify-between mb-2.5 flex-wrap gap-2">
+        {/* Row 1: Inbox + controls + action icons */}
+        <div className="flex items-center justify-between mb-2 gap-2">
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold">{t('inbox')}</span>
             {unreadCount > 0 && (
@@ -224,30 +226,41 @@ export default function EmailList({
               )}
             </button>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <button
+                className="w-7 h-7 rounded-md border-none bg-transparent cursor-pointer flex items-center justify-center text-[var(--text-muted)] transition-all duration-200 hover:bg-[var(--accent)]/10 hover:text-[var(--accent)]"
+                onClick={() => onMarkAllRead?.()}
+                title={t('markAllRead')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 12.5l5 5L17 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M7 12.5l5 5L23 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
             {emails.length > 0 && (
               <button
-                className="flex items-center gap-1 py-1 px-2.5 rounded-md border border-[var(--border)] bg-transparent cursor-pointer text-[11px] text-[var(--text-muted)] hover:border-[var(--error)] hover:text-[var(--error)] hover:bg-red-500/10 transition-all duration-150"
+                className="w-7 h-7 rounded-md border-none bg-transparent cursor-pointer flex items-center justify-center text-[var(--text-muted)] transition-all duration-200 hover:bg-red-500/10 hover:text-[var(--error)]"
                 onClick={() => setShowClearConfirm(true)}
                 title={t('clearAll')}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   <path d="M9 6V4h6v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {t('clearAll')}
               </button>
             )}
-            <div className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2 py-1 rounded-md max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap flex flex-col gap-0.5">
-              <span>{account.address}</span>
-              {isAdmin && (
-                <span className="text-[var(--accent)]">Owner: {account.owner?.username || 'unknown'}</span>
-              )}
-            </div>
           </div>
+        </div>
+        {/* Row 2: Account address */}
+        <div className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2 py-1 rounded-md flex flex-col gap-0.5 mb-2.5">
+          <span className="truncate">{account.address}</span>
+          {isAdmin && (
+            <span className="text-[var(--accent)] truncate">Owner: {account.owner?.username || 'unknown'}</span>
+          )}
         </div>
 
         {/* Clear Confirm Bar */}

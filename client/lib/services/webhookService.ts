@@ -237,18 +237,52 @@ export async function deleteWebhook(webhookId: string, userId: string): Promise<
 // ============================================
 
 const BLOCKED_HOSTNAMES = new Set([
-  'localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]',
+  'localhost', '0.0.0.0',
   'metadata.google.internal', 'metadata.google',
   '169.254.169.254', // AWS/GCP metadata endpoint
+  '100.100.100.200',  // Alibaba Cloud metadata
+  'metadata.azure.com',
 ]);
 
-function isPrivateIP(hostname: string): boolean {
-  // Check blocked hostnames
-  if (BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) return true;
+const LOOPBACK_HOSTNAMES = new Set([
+  'localhost', 'ip6-localhost', 'ip6-loopback',
+]);
 
-  // Check private IP ranges
-  const parts = hostname.split('.').map(Number);
-  if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+const BLOCKED_IPV6_PREFIXES = [
+  '::1',           // loopback
+  '::',             // unspecified
+  'fc00::', 'fd00::', // unique local
+  'fe80::',         // link-local
+  '2001:db8::',     // documentation
+];
+
+function isLoopbackIPv6(ip: string): boolean {
+  return ip === '::1' || ip.startsWith('fe80:');
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const lower = ip.toLowerCase();
+  return BLOCKED_IPV6_PREFIXES.some(prefix => lower.startsWith(prefix)) || lower === '::';
+}
+
+function isPrivateIP(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+
+  // Block known dangerous hostnames
+  if (BLOCKED_HOSTNAMES.has(h)) return true;
+
+  // Block loopback hostnames (including ip6- variants)
+  if (LOOPBACK_HOSTNAMES.has(h)) return true;
+
+  // IPv6 literal addresses (e.g. [::1], [fe80::1])
+  const ipv6Match = h.match(/^\[([^\]]+)\]$/);
+  if (ipv6Match) {
+    return isPrivateIPv6(ipv6Match[1]) || isLoopbackIPv6(ipv6Match[1]);
+  }
+
+  // Standard IPv4 dotted notation
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) {
+    const parts = h.split('.').map(Number);
     // 10.0.0.0/8
     if (parts[0] === 10) return true;
     // 172.16.0.0/12
@@ -280,9 +314,14 @@ function validateWebhookUrl(url: string): { valid: boolean; error?: string } {
       return { valid: false, error: `Unsupported protocol: ${parsed.protocol}` };
     }
 
-    // Block private/internal IPs (SSRF protection)
+    // SSRF protection: validate hostname/IP before any connection
     if (isPrivateIP(parsed.hostname)) {
       return { valid: false, error: 'Webhook URL cannot target internal/private addresses' };
+    }
+
+    // Block URLs containing credentials or unusual ports that might be used for internal services
+    if (parsed.port && ['22', '23', '25', '3306', '5432', '6379', '27017', '11211'].includes(parsed.port)) {
+      return { valid: false, error: 'Webhook URLs cannot target administrative ports' };
     }
 
     return { valid: true };

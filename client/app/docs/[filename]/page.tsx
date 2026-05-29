@@ -2,6 +2,156 @@ import fs from 'fs';
 import path from 'path';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import type { Metadata } from 'next';
+import DocHeader from './DocHeader';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://tmailcc.app';
+
+// ============ SEO: Dynamic metadata for docs pages ============
+
+// Map friendly slug → display title + meta description
+const DOCS_META: Record<string, { title: string; description: string; keywords: string[] }> = {
+  'api-guide': {
+    title: 'tmailCC API Guide - Hướng dẫn sử dụng API đầy đủ',
+    description:
+      'Tài liệu hướng dẫn sử dụng tmailCC API v1 đầy đủ nhất. Tạo email, xem hộp thư, đọc email, chờ OTP, xóa tài khoản, webhook. Có ví dụ JavaScript/TypeScript.',
+    keywords: [
+      'tmailcc api',
+      'email api',
+      'webhook api',
+      'api documentation',
+      'email developer',
+      'mail api',
+      'rest api email',
+      'api endpoint',
+    ],
+  },
+  'developer-api': {
+    title: 'tmailCC Developer API - Tích hợp API cho nhà phát triển',
+    description:
+      'Tích hợp tmailCC API vào ứng dụng của bạn. API keys, rate limiting, webhook events, OAuth2, ví dụ code JavaScript/Python/Go, SDK documentation.',
+    keywords: [
+      'tmailcc developer api',
+      'email api integration',
+      'webhook email',
+      'api key authentication',
+      'developer documentation',
+      'rate limiting api',
+      'email automation api',
+    ],
+  },
+  'chucnang-tmailCC': {
+    title: 'tmailCC - Tính năng đầy đủ | Gmail Hub, Dotmail, OTP, Webhook',
+    description:
+      'Khám phá tất cả tính năng của tmailCC: nhận mail tập trung, Gmail Hub, email tên miền riêng, sinh dotmail, trích xuất OTP tự động, 2FA Authenticator, webhook.',
+    keywords: [
+      'tính năng tmailcc',
+      'gmail hub',
+      'gmail dotmail',
+      'email tên miền riêng',
+      'otp tự động',
+      'webhook email',
+    ],
+  },
+  'bocauhoi': {
+    title: 'tmailCC FAQ - Câu hỏi thường gặp',
+    description:
+      'Trả lời các câu hỏi thường gặp về tmailCC: cách tạo email tạm thời, sử dụng Gmail Hub, sinh dotmail, lấy mã OTP, tích hợp webhook, bảo mật và quyền riêng tư.',
+    keywords: ['faq tmailcc', 'câu hỏi thường gặp', 'hướng dẫn sử dụng', 'trợ giúp'],
+  },
+  'docker-guide': {
+    title: 'tmailCC Docker Guide - Triển khai bằng Docker',
+    description:
+      'Hướng dẫn cài đặt và triển khai tmailCC bằng Docker và Docker Compose. Cấu hình môi trường, biến môi trường, SSL, reverse proxy, database setup.',
+    keywords: ['docker tmailcc', 'docker compose', 'deploy tmailcc', 'self-hosted email', 'container email'],
+  },
+  'deploy-vps': {
+    title: 'tmailCC VPS Deployment Guide - Triển khai trên VPS',
+    description:
+      'Hướng dẫn triển khai tmailCC trên VPS với Nginx, SSL, domain configuration, PM2 process manager, và tối ưu hiệu suất cho production.',
+    keywords: ['deploy tmailcc vps', 'nginx setup', 'vps email', 'self-hosted mail'],
+  },
+  'supabase-setup': {
+    title: 'tmailCC Supabase Setup - Cấu hình Supabase Database',
+    description:
+      'Hướng dẫn cấu hình Supabase cho tmailCC: database schema, authentication, Row Level Security policies, storage buckets, realtime subscriptions, environment variables.',
+    keywords: ['supabase tmailcc', 'database setup', 'row level security', 'supabase auth', 'postgresql'],
+  },
+  'technical-report': {
+    title: 'tmailCC Technical Report - Báo cáo kỹ thuật',
+    description:
+      'Báo cáo kỹ thuật chi tiết về kiến trúc tmailCC: tech stack, database design, security model, realtime architecture, API design, và các decision records.',
+    keywords: ['technical report tmailcc', 'architecture', 'system design', 'database schema'],
+  },
+  'api-test-checklist': {
+    title: 'tmailCC API Test Checklist - Danh sách kiểm tra API',
+    description:
+      'Danh sách kiểm tra đầy đủ cho tmailCC API endpoints: authentication, rate limiting, error handling, webhook delivery, OTP extraction, email operations.',
+    keywords: ['api test', 'test checklist', 'endpoint testing', 'api validation'],
+  },
+  'quychethi': {
+    title: 'tmailCC Terms of Service - Quy chế và điều khoản sử dụng',
+    description: 'Quy chế và điều khoản sử dụng dịch vụ tmailCC.',
+    keywords: ['điều khoản sử dụng', 'quy chế', 'terms of service', 'privacy policy'],
+  },
+  'ai-prompts-appendix': {
+    title: 'tmailCC AI Prompts Appendix - Prompt cho AI Assistant',
+    description:
+      'Danh sách prompt mẫu để sử dụng tmailCC API với AI assistant như Claude, GPT, Gemini. Ví dụ code và best practices.',
+    keywords: ['ai prompts', 'claude code', 'openai api', 'prompt engineering'],
+  },
+  'realtime-audit-report': {
+    title: 'tmailCC Realtime Audit Report - Kiểm toán realtime system',
+    description:
+      'Báo cáo kiểm toán hệ thống realtime của tmailCC: Supabase Realtime, Broadcast channels, multi-tab sync, WebSocket connections, và performance analysis.',
+    keywords: ['realtime system', 'websocket', 'supabase realtime', 'real-time email'],
+  },
+};
+
+interface PageProps {
+  params: {
+    filename: string;
+  };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { filename } = params;
+  const safeFilename = filename.endsWith('.md') ? filename : filename;
+
+  const meta = DOCS_META[safeFilename];
+  if (meta) {
+    return {
+      title: meta.title,
+      description: meta.description,
+      keywords: meta.keywords,
+      alternates: {
+        canonical: `${APP_URL}/docs/${safeFilename}`,
+      },
+      openGraph: {
+        type: 'article',
+        locale: 'vi_VN',
+        url: `${APP_URL}/docs/${safeFilename}`,
+        siteName: 'tmailCC',
+        title: meta.title,
+        description: meta.description,
+        images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'tmailCC' }],
+      },
+    };
+  }
+
+  // Fallback: generate from filename
+  const displayTitle = safeFilename
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  return {
+    title: `tmailCC - ${displayTitle}`,
+    description: `Tài liệu ${displayTitle} cho tmailCC.`,
+    alternates: {
+      canonical: `${APP_URL}/docs/${safeFilename}`,
+    },
+  };
+}
 
 interface PageProps {
   params: {
@@ -246,14 +396,7 @@ export default function DocPage({ params }: PageProps) {
       <div className="max-w-4xl mx-auto">
         
         {/* Navigation Breadcrumb */}
-        <div className="mb-8 border-b-4 border-black pb-4 flex items-center justify-between">
-          <Link href="/" className="jp-btn hover:underline text-xs flex items-center gap-2">
-            ← Quay Lại Trang Chủ
-          </Link>
-          <span className="font-mono text-xs uppercase text-neutral-500 tracking-wider">
-            Tài Liệu Hệ Thống: {safeFilename}
-          </span>
-        </div>
+        <DocHeader safeFilename={safeFilename} />
 
         {/* Rendered Document */}
         <article className="prose prose-neutral max-w-none">

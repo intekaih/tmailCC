@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/otp-key - Generate OTP access key for an email address
- * Body: { address: "user1@kaih.co.uk", note?: "Cấp cho Minh" }
+ * Body: { address: "user1@tmailcc.app", note?: "Cấp cho Minh" }
  * Returns: { address, accessKey, credential }
  */
 export async function POST(request: NextRequest) {

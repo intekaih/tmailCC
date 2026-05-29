@@ -7,8 +7,7 @@ import { createClient as createDirectSupabaseClient } from '@supabase/supabase-j
 import { getGuestAccounts, saveGuestAccount, removeGuestAccount } from '@/components/Sidebar';
 import AuthModal from '@/components/AuthModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
-import AdminPanel from '@/components/AdminPanel';
-import DeveloperSettings from '@/components/DeveloperSettings';
+import SettingsPanel from '@/components/SettingsPanel';
 import Sidebar from '@/components/Sidebar';
 import EmailList from '@/components/EmailList';
 import EmailView from '@/components/EmailView';
@@ -153,8 +152,8 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showDeveloperSettings, setShowDeveloperSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsDefaultTab, setSettingsDefaultTab] = useState<string | undefined>(undefined);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showQRModal, setShowQRModal] = useState<string | null>(null);
   const [domainVersion, setDomainVersion] = useState(0);
@@ -163,6 +162,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
   const [locale, setLocale] = useState<Locale>('vi');
 
   // Refs for stable access in callbacks
@@ -712,8 +712,30 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
     }
   }
 
+  async function handleMarkAllRead() {
+    if (!selectedAccount) return;
+    const unreadEmails = emails.filter(e => !e.isRead);
+    if (unreadEmails.length === 0) return;
+    try {
+      await Promise.all(
+        unreadEmails.map(e => api.emails.markRead(e._id, true, selectedAccount.address))
+      );
+      setEmails(prev => prev.map(e => ({ ...e, isRead: true })));
+      setUnreadCount(0);
+      setAccounts(prev => prev.map(acc =>
+        acc.address === selectedAccount.address
+          ? { ...acc, unreadCount: 0 }
+          : acc
+      ));
+      showToast(t('markAllReadSuccess'), 'success');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
   function handleSelectAccount(account: Account) {
     setSelectedAccount(account);
+    setMobileView('list');
     loadEmails(account);
   }
 
@@ -760,6 +782,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
 
   async function handleSelectEmail(email: Email) {
     setSelectedEmail(email);
+    setMobileView('detail');
     if (!email.isRead) {
       try {
         await api.emails.markRead(email._id, true, email.to);
@@ -858,8 +881,7 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
       <LoadingKeyframes />
       <AnimatedBackground variant="gradient" intensity="low" />
       <div className="app-container">
-        {showAdminPanel && user?.role === 'admin' && <AdminPanel onClose={() => setShowAdminPanel(false)} onDomainsChanged={handleDomainsChanged} />}
-        {showDeveloperSettings && <DeveloperSettings onClose={() => setShowDeveloperSettings(false)} />}
+        {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} defaultTab={settingsDefaultTab} onDomainsChanged={handleDomainsChanged} />}
         {showAuthModal && <AuthModal onLogin={handleLogin} onClose={() => setShowAuthModal(false)} />}
         {showChangePassword && user && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
         {showQRModal && <QRModal address={showQRModal} onClose={() => setShowQRModal(null)} />}
@@ -875,11 +897,45 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
           <DotmailView account={selectedAccount as any} />
         ) : (
           <>
-            <EmailList emails={emails} selectedEmail={selectedEmail} onSelectEmail={handleSelectEmail}
-              onRefresh={() => selectedAccount && loadEmails(selectedAccount)}
-              onClearAll={handleClearAllEmails} loading={emailsLoading} account={selectedAccount} />
+            {/* Mobile: List view */}
+            <div className={`email-list-wrap flex flex-col h-screen overflow-hidden ${mobileView === 'detail' ? 'hidden md:flex' : 'flex'} md:flex`}>
+              {/* Mobile back button */}
+              <div className="md:hidden flex items-center gap-2 p-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex-shrink-0">
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent border-none cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  onClick={() => { setSelectedEmail(null); setMobileView('list'); }}
+                  title="Quay lại danh sách"
+                  aria-label="Quay lại danh sách thư"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7 7"/>
+                  </svg>
+                </button>
+                <span className="text-xs text-[var(--text-muted)]">Danh sách thư</span>
+              </div>
+              <EmailList emails={emails} selectedEmail={selectedEmail} onSelectEmail={handleSelectEmail}
+                onRefresh={() => selectedAccount && loadEmails(selectedAccount)}
+                onClearAll={handleClearAllEmails} onMarkAllRead={handleMarkAllRead} loading={emailsLoading} account={selectedAccount} />
+            </div>
 
-            <EmailView email={selectedEmail} onToggleStar={handleToggleStar} onDelete={handleDeleteEmail} />
+            {/* Mobile: Detail view */}
+            <div className={`email-view-wrap flex-1 flex flex-col overflow-hidden h-screen ${mobileView === 'list' ? 'hidden md:flex' : 'flex'} md:flex`}>
+              {/* Mobile back button */}
+              <div className="md:hidden flex items-center gap-2 p-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex-shrink-0">
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent border-none cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  onClick={() => setMobileView('list')}
+                  title="Quay lại danh sách"
+                  aria-label="Quay lại danh sách thư"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7 7"/>
+                  </svg>
+                </button>
+                <span className="text-xs text-[var(--text-muted)] truncate max-w-[200px]">{selectedEmail?.subject || 'Email'}</span>
+              </div>
+              <EmailView email={selectedEmail} onToggleStar={handleToggleStar} onDelete={handleDeleteEmail} />
+            </div>
           </>
         )}
 
@@ -906,21 +962,13 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
                   avatarUrl={user.avatarUrl}
                   username={user.username}
                   size={32}
-                  onAvatarChange={(newUrl) => setUser(prev => prev ? { ...prev, avatarUrl: newUrl } : prev)}
+                  onAvatarChange={(newUrl) => { if (user) setUser({ ...user, avatarUrl: newUrl }); }}
                 />
                 <span className="user-info">
-                  <span className="user-name">{user.username}</span>
+                  <span className="user-name">{user.preferences?.displayName || user.username}</span>
                   {user.role === 'admin' && <span className="role-badge">{t('admin')}</span>}
                 </span>
-                {user.role === 'admin' && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAdminPanel(true)} title={t('adminPanel')} aria-label={t('adminPanel')}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                  </button>
-                )}
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowDeveloperSettings(true)} title={locale === 'vi' ? 'Cài đặt tài khoản & API' : 'Account & API Settings'} aria-label={locale === 'vi' ? 'Cài đặt tài khoản & API' : 'Account & API Settings'}>
+                <button className={`btn btn-ghost btn-sm ${showSettings ? 'active' : ''}`} onClick={() => { setShowSettings(true); setSettingsDefaultTab('stats'); }} title={locale === 'vi' ? 'Cài đặt' : 'Settings'} aria-label={locale === 'vi' ? 'Cài đặt' : 'Settings'}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1037,8 +1085,14 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
       </div>
 
       <style jsx global>{`
+        .email-list-wrap { width: 100%; flex-shrink: 0; }
+        .email-view-wrap { flex: 1; min-width: 0; }
+        @media (min-width: 768px) {
+          .email-list-wrap { width: var(--list-width); flex-shrink: 0; }
+          .email-view-wrap { flex: 1; min-width: 0; }
+        }
         .initial-loading { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); }
-        .topbar { position: fixed; top: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); min-width: 200px; }
+        .topbar { position: fixed; top: 0; right: 0; z-index: 200; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); min-width: 200px; }
         .topbar-left { display: flex; align-items: center; gap: 8px; }
         .topbar-right { display: flex; align-items: center; gap: 4px; }
         .hamburger-btn { display: none; width: 36px; height: 36px; border-radius: 8px; border: none; background: transparent; cursor: pointer; color: var(--text-secondary); align-items: center; justify-content: center; transition: background 0.15s; }
@@ -1054,10 +1108,10 @@ function HomePageInner({ initialData }: { initialData?: InitialServerData }) {
         .icon-btn.active { color: var(--accent); }
         .lang-btn { border: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
         .lang-btn:hover { color: var(--accent); border-color: var(--accent); }
-        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.3); white-space: nowrap; }
-        .toast-success { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: var(--success); }
-        .toast-error { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--error); }
-        .toast-info { background: var(--bg-tertiary); border: 1px solid var(--border-light); color: var(--text-primary); }
+        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 0px; border: 2px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; z-index: 9999; box-shadow: var(--shadow); white-space: nowrap; text-align: center; justify-content: center; width: max-content; max-width: 90vw; }
+        .toast-success { background: var(--bg-primary); border: 2px solid var(--border); color: var(--text-primary); }
+        .toast-error { background: var(--bg-primary); border: 2px solid var(--border); color: var(--text-primary); }
+        .toast-info { background: var(--bg-primary); border: 2px solid var(--border); color: var(--text-primary); }
         .realtime-indicator { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; }
         .realtime-indicator.connected { color: var(--success, #22c55e); }
         .realtime-indicator.disconnected { color: var(--text-muted); }

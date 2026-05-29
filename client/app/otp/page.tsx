@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import AnimatedBackground from '@/components/AnimatedBackground';
 
 interface EmailItem {
@@ -12,7 +13,115 @@ interface EmailItem {
   receivedAt: string;
 }
 
+const OTP_TRANSLATIONS = {
+  vi: {
+    pageTitle: 'tmailCC OTP - Lấy mã xác minh OTP tự động | 2FA Authenticator',
+    subtitle: 'Nhập mã truy cập để lấy mã xác minh email',
+    labelMailbox: 'Truy cập hộp thư (Email | Key)',
+    placeholderMailbox: 'email@domain.com|accesskey',
+    hintMailbox: 'Định dạng: email|key (hoặc dán cả chuỗi kèm 2FA)',
+    btnAccess: 'Truy cập hộp thư',
+    label2fa: 'Giải mã 2FA (Authenticator)',
+    placeholder2fa: 'Dán mã 2FA Secret Key tại đây...',
+    hint2fa: 'Tự sinh OTP 6 số cho Spotify, Grok, Facebook...',
+    clipboardPaste: 'Dán từ Clipboard',
+    pasteWarning: 'Hãy nhấn Ctrl+V để dán mã 2FA.',
+    noClipboardPermission: 'Không có quyền đọc Clipboard. Hãy cấp quyền cho trình duyệt hoặc dùng phím tắt Ctrl+V để dán.',
+    rotatesIn: 'Xoay vòng sau {seconds} giây',
+    copy2fa: 'Copy mã 2FA',
+    copyEmail: 'Sao chép địa chỉ email',
+    logout: 'Đăng xuất',
+    latestOtp: 'Mã xác minh mới nhất',
+    autoRefresh: 'Tự động cập nhật',
+    waitingCode: 'Đang chờ mã mới...',
+    copyOtp: 'Copy mã xác minh',
+    inbox: 'Thư đến ({count})',
+    noEmails: 'Chưa có thư — đang chờ email mới...',
+    justNow: 'Vừa xong',
+    minAgo: 'phút trước',
+    hoursAgo: 'giờ trước',
+    invalidFormat: 'Nhập đúng định dạng: email|key hoặc nhập riêng 2FA Secret',
+    guideTitle: 'Hướng dẫn Giải mã 2FA',
+    guideIntro: 'Chức năng Giải mã 2FA (Authenticator) trên trang /otp được xây dựng theo tiêu chuẩn quốc tế TOTP (RFC 6238) — đây chính là chuẩn chung mà Google Authenticator và Microsoft Authenticator đang sử dụng.',
+    guideDetail: 'Vì vậy, chức năng này hoàn toàn sử dụng được cho Spotify, Grok (X), Facebook, GitHub, Google, Discord, Microsoft... và hầu hết mọi dịch vụ trực tuyến hiện nay, chứ không chỉ giới hạn ở ChatGPT.',
+    guideStepsTitle: 'Cách sử dụng cho các dịch vụ khác:',
+    guideStep1: 'Khi bạn bật bảo mật 2 lớp (2FA) trên các trang web như Spotify, Grok,... họ sẽ hiển thị một mã QR kèm theo một dòng mã chữ và số viết hoa gọi là Secret Key (Khóa bí mật hoặc Mã thiết lập thủ công).',
+    guideStep2: 'Bạn chỉ cần sao chép đoạn Secret Key đó và dán vào ô Giải mã 2FA (Authenticator) trên tmailCC.',
+    guideStep3: 'Hệ thống sẽ ngay lập tức sinh ra mã 6 chữ số tự động xoay vòng sau mỗi 30 giây, trùng khớp hoàn toàn với mã hiển thị trên ứng dụng Google Authenticator ở điện thoại của bạn.',
+    guideUnderstand: 'Đã hiểu',
+    guideTooltip: 'Hướng dẫn sử dụng 2FA',
+    running: 'Đang chạy',
+    enableGen: 'Bật sinh mã',
+    placeholderBase32: 'Dán mã 2FA Secret Key (Base32) tại đây...',
+    connectionError: 'Không thể kết nối server',
+    errorLabel: 'Lỗi',
+    copyCodeTooltip: 'Click để copy mã',
+  },
+  en: {
+    pageTitle: 'tmailCC OTP - Automated OTP Verification Code Retrieval | 2FA Authenticator',
+    subtitle: 'Enter access key to retrieve email verification code',
+    labelMailbox: 'Access Mailbox (Email | Key)',
+    placeholderMailbox: 'email@domain.com|accesskey',
+    hintMailbox: 'Format: email|key (or paste entire string with 2FA)',
+    btnAccess: 'Access Mailbox',
+    label2fa: '2FA Decoder (Authenticator)',
+    placeholder2fa: 'Paste 2FA Secret Key here...',
+    hint2fa: 'Auto-generate 6-digit OTP for Spotify, Grok, Facebook...',
+    clipboardPaste: 'Paste from Clipboard',
+    pasteWarning: 'Please press Ctrl+V to paste 2FA code.',
+    noClipboardPermission: 'No clipboard read permission. Please grant permission or use Ctrl+V shortcut.',
+    rotatesIn: 'Rotates in {seconds} seconds',
+    copy2fa: 'Copy 2FA code',
+    copyEmail: 'Copy email address',
+    logout: 'Log Out',
+    latestOtp: 'Latest verification code',
+    autoRefresh: 'Auto Refresh',
+    waitingCode: 'Waiting for new code...',
+    copyOtp: 'Copy verification code',
+    inbox: 'Inbox ({count})',
+    noEmails: 'No emails yet — waiting for new messages...',
+    justNow: 'Just now',
+    minAgo: 'minutes ago',
+    hoursAgo: 'hours ago',
+    invalidFormat: 'Enter correct format: email|key or separate 2FA Secret',
+    guideTitle: '2FA Decoding Guide',
+    guideIntro: 'The 2FA Decoder (Authenticator) function on /otp is built according to the international TOTP standard (RFC 6238) — this is the same standard used by Google Authenticator and Microsoft Authenticator.',
+    guideDetail: 'Therefore, this feature is fully compatible with Spotify, Grok (X), Facebook, GitHub, Google, Discord, Microsoft... and almost any online service today, not just ChatGPT.',
+    guideStepsTitle: 'How to use for other services:',
+    guideStep1: 'When you enable two-factor authentication (2FA) on sites like Spotify, Grok, etc., they will display a QR code along with an alphanumeric uppercase string called Secret Key.',
+    guideStep2: 'Simply copy that Secret Key and paste it into the 2FA Decoder (Authenticator) box on tmailCC.',
+    guideStep3: 'The system will immediately generate a 6-digit code that automatically rotates every 30 seconds, perfectly matching the code shown on your phone\'s Google Authenticator app.',
+    guideUnderstand: 'Got it',
+    guideTooltip: '2FA User Guide',
+    running: 'Running',
+    enableGen: 'Enable generator',
+    placeholderBase32: 'Paste 2FA Secret Key (Base32) here...',
+    connectionError: 'Cannot connect to server',
+    errorLabel: 'Error',
+    copyCodeTooltip: 'Click to copy code',
+  }
+};
+
 export default function OTPPage() {
+  const [locale, setLocale] = useState<'vi' | 'en'>('vi');
+
+  useEffect(() => {
+    const storedLocale = localStorage.getItem('tmail_locale');
+    if (storedLocale === 'en' || storedLocale === 'vi') {
+      setLocale(storedLocale as 'vi' | 'en');
+    }
+  }, []);
+
+  const t = useCallback((key: keyof typeof OTP_TRANSLATIONS.vi) => {
+    return OTP_TRANSLATIONS[locale][key] || OTP_TRANSLATIONS.vi[key] || '';
+  }, [locale]);
+
+  const handleToggleLocale = () => {
+    const nextLocale = locale === 'vi' ? 'en' : 'vi';
+    setLocale(nextLocale);
+    localStorage.setItem('tmail_locale', nextLocale);
+  };
+
   const [credential, setCredential] = useState('');
   const [inputTwofaSecret, setInputTwofaSecret] = useState('');
   const [verified, setVerified] = useState(false);
@@ -241,10 +350,10 @@ export default function OTPPage() {
     const d = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
-    if (diff < 60000) return 'Vừa xong';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} giờ trước`;
-    return d.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    if (diff < 60000) return t('justNow');
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} ${t('minAgo')}`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)} ${t('hoursAgo')}`;
+    return d.toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
   if (!mounted) {
@@ -298,15 +407,32 @@ export default function OTPPage() {
         }}
       >
         {/* Header */}
-        <div className="otp-header">
-          <div className="otp-logo">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="2"/>
-              <path d="M2 7L12 13L22 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span>tmailCC</span>
+        <div className="otp-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%', borderBottom: '1px solid var(--border-light)', paddingBottom: '16px', marginBottom: '20px' }}>
+          <div className="otp-logo-container" style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+            <div className="otp-logo" style={{ justifyContent: 'flex-start', marginBottom: 0 }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="2"/>
+                <path d="M2 7L12 13L22 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              <span>tmailCC</span>
+            </div>
+            <p className="otp-subtitle" style={{ margin: 0 }}>{t('subtitle')}</p>
           </div>
-          <p className="otp-subtitle">Nhập mã truy cập để lấy mã xác minh email</p>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* EN/VI Toggle Button */}
+            <button 
+              onClick={handleToggleLocale}
+              className="mfa-toggle-btn"
+              style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', fontWeight: 'bold' }}
+              title={locale === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+            >
+              {locale === 'vi' ? 'EN' : 'VI'}
+            </button>
+            <Link href="/" className="mfa-toggle-btn" style={{ padding: '6px 12px', fontSize: '11px', textDecoration: 'none', textAlign: 'center' }}>
+              Home
+            </Link>
+          </div>
         </div>
 
         {!verified ? (
@@ -320,11 +446,11 @@ export default function OTPPage() {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
-                  Truy cập hộp thư (Email | Key)
+                  {t('labelMailbox')}
                 </label>
                 <input
                   type="text"
-                  placeholder="email@domain.com|accesskey"
+                  placeholder={t('placeholderMailbox')}
                   value={credential}
                   onChange={e => {
                     setCredential(e.target.value);
@@ -333,7 +459,7 @@ export default function OTPPage() {
                   autoFocus
                   spellCheck={false}
                 />
-                <span className="input-hint">Định dạng: email|key (hoặc dán cả chuỗi kèm 2FA)</span>
+                <span className="input-hint">{t('hintMailbox')}</span>
               </div>
 
               {error && <div className="form-error-otp">{error}</div>}
@@ -348,7 +474,7 @@ export default function OTPPage() {
                     <line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
                 )}
-                Truy cập hộp thư
+                {t('btnAccess')}
               </button>
             </form>
 
@@ -360,13 +486,13 @@ export default function OTPPage() {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  Giải mã 2FA (Authenticator)
+                  {t('label2fa')}
                 </label>
                 <div className="mfa-input-wrapper">
                   <input
                     type="text"
                     className="mfa-input"
-                    placeholder="Dán mã 2FA Secret Key tại đây..."
+                    placeholder={t('placeholder2fa')}
                     value={inputTwofaSecret}
                     onChange={e => {
                       setInputTwofaSecret(e.target.value);
@@ -386,7 +512,7 @@ export default function OTPPage() {
                     onClick={async () => {
                       try {
                         if (!navigator.clipboard || !navigator.clipboard.readText) {
-                          throw new Error("Clipboard API not supported");
+                           throw new Error("Clipboard API not supported");
                         }
                         const text = await navigator.clipboard.readText();
                         if (text) {
@@ -397,11 +523,11 @@ export default function OTPPage() {
                         }
                       } catch (err) {
                         console.error("Failed to read clipboard:", err);
-                        setTwofaError("Hãy nhấn Ctrl+V để dán mã 2FA.");
+                        setTwofaError(t('pasteWarning'));
                         setTimeout(() => setTwofaError(""), 5000);
                       }
                     }}
-                    title="Dán từ Clipboard"
+                    title={t('clipboardPaste')}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -409,7 +535,7 @@ export default function OTPPage() {
                     </svg>
                   </button>
                 </div>
-                <span className="input-hint">Tự sinh OTP 6 số cho Spotify, Grok, Facebook...</span>
+                <span className="input-hint">{t('hint2fa')}</span>
               </div>
 
               {twofaError && <div className="form-error-otp" style={{ marginTop: '10px' }}>{twofaError}</div>}
@@ -428,7 +554,7 @@ export default function OTPPage() {
                             setTimeout(() => setCopied2fa(false), 2000);
                           });
                         }}
-                        title="Copy mã 2FA"
+                        title={t('copy2fa')}
                         style={{ width: '34px', height: '34px' }}
                       >
                         {copied2fa ? (
@@ -447,7 +573,7 @@ export default function OTPPage() {
 
                   {twofaRemaining > 0 && (
                     <div className="mfa-progress-row" style={{ marginTop: '2px' }}>
-                      <span className="mfa-timer-text">Xoay vòng sau {twofaRemaining} giây</span>
+                      <span className="mfa-timer-text">{t('rotatesIn').replace('{seconds}', String(twofaRemaining))}</span>
                       <div className="mfa-progress-track">
                         <div 
                           className="mfa-progress-bar" 
@@ -481,7 +607,7 @@ export default function OTPPage() {
                       setTimeout(() => setCopied(null), 2000);
                     });
                   }}
-                  title="Sao chép địa chỉ email"
+                  title={t('copyEmail')}
                 >
                   {copied === 'address' ? (
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -499,7 +625,7 @@ export default function OTPPage() {
                   Live
                 </span>
               </div>
-              <button className="logout-btn" onClick={handleLogout} title="Đăng xuất">
+              <button className="logout-btn" onClick={handleLogout} title={t('logout')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -514,10 +640,10 @@ export default function OTPPage() {
                 {/* Latest OTP Code */}
                 <div className="code-card">
                   <div className="code-card-header">
-                    <span className="code-label">Mã xác minh mới nhất</span>
+                    <span className="code-label">{t('latestOtp')}</span>
                     <span className="auto-refresh-badge">
                       <span className="pulse-dot" />
-                      Tự động cập nhật
+                      {t('autoRefresh')}
                     </span>
                   </div>
                   <div className="code-display">
@@ -527,7 +653,7 @@ export default function OTPPage() {
                         <button
                           className={`copy-btn ${copied === 'main' ? 'copied' : ''}`}
                           onClick={() => copyCode(latestCode, 'main')}
-                          title="Copy mã xác minh"
+                          title={t('copyOtp')}
                         >
                           {copied === 'main' ? (
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -547,7 +673,7 @@ export default function OTPPage() {
                           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
                           <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                         </svg>
-                        Đang chờ mã mới...
+                        {t('waitingCode')}
                       </span>
                     )}
                   </div>
@@ -561,7 +687,7 @@ export default function OTPPage() {
                         <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/>
                         <path d="M2 7L12 13L22 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
-                      Thư đến ({emails.length})
+                      {t('inbox').replace('{count}', String(emails.length))}
                     </div>
                     <div className="email-list-otp">
                       {emails.map(em => (
@@ -576,7 +702,7 @@ export default function OTPPage() {
                           </div>
                           <div className="email-subject-otp">{em.subject}</div>
                           {em.code && (
-                            <div className="email-code-badge" onClick={(ev) => { ev.stopPropagation(); copyCode(em.code!, 'e-' + em.id); }} title="Click để copy mã">
+                            <div className="email-code-badge" onClick={(ev) => { ev.stopPropagation(); copyCode(em.code!, 'e-' + em.id); }} title={t('copyCodeTooltip')}>
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2"/>
@@ -604,7 +730,7 @@ export default function OTPPage() {
                       <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/>
                       <path d="M2 7L12 13L22 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>
-                    <p>Chưa có thư — đang chờ email mới...</p>
+                    <p>{t('noEmails')}</p>
                   </div>
                 )}
               </div>
@@ -619,7 +745,7 @@ export default function OTPPage() {
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                       </svg>
-                      Giải mã 2FA (Authenticator)
+                      {t('label2fa')}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button 
@@ -627,12 +753,12 @@ export default function OTPPage() {
                         onClick={() => setTwofaActive(!twofaActive)}
                         disabled={!twofaSecret.trim()}
                       >
-                        {twofaActive ? 'Đang chạy' : 'Bật sinh mã'}
+                        {twofaActive ? t('running') : t('enableGen')}
                       </button>
                       <button
                         type="button"
                         onClick={() => setShow2faGuide(true)}
-                        title="Hướng dẫn sử dụng 2FA"
+                        title={t('guideTooltip')}
                         style={{
                           width: '22px',
                           height: '22px',
@@ -662,7 +788,7 @@ export default function OTPPage() {
                     <input 
                       type="text" 
                       className="mfa-input"
-                      placeholder="Dán mã 2FA Secret Key (Base32) tại đây..."
+                      placeholder={t('placeholderBase32')}
                       value={twofaSecret}
                       onChange={(e) => {
                         setTwofaSecret(e.target.value);
@@ -690,11 +816,11 @@ export default function OTPPage() {
                           }
                         } catch (err) {
                           console.error("Failed to read clipboard:", err);
-                          setTwofaError("Không có quyền đọc Clipboard. Hãy cấp quyền cho trình duyệt hoặc dùng phím tắt Ctrl+V để dán.");
+                          setTwofaError(t('noClipboardPermission'));
                           setTimeout(() => setTwofaError(""), 5000);
                         }
                       }}
-                      title="Dán từ Clipboard"
+                      title={t('clipboardPaste')}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -716,10 +842,10 @@ export default function OTPPage() {
                               const rawOtp = twofaOtp.replace(/\s/g, '');
                               navigator.clipboard?.writeText(rawOtp).then(() => {
                                 setCopied2fa(true);
-                                setTimeout(() => setCopied2fa(false), 2000);
+                                  setTimeout(() => setCopied2fa(false), 2000);
                               });
                             }}
-                            title="Copy mã 2FA"
+                            title={t('copy2fa')}
                           >
                             {copied2fa ? (
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -737,7 +863,7 @@ export default function OTPPage() {
 
                       {twofaRemaining > 0 && (
                         <div className="mfa-progress-row">
-                          <span className="mfa-timer-text">Xoay vòng sau {twofaRemaining} giây</span>
+                          <span className="mfa-timer-text">{t('rotatesIn').replace('{seconds}', String(twofaRemaining))}</span>
                           <div className="mfa-progress-track">
                             <div 
                               className="mfa-progress-bar" 
@@ -775,11 +901,11 @@ export default function OTPPage() {
             }}
           >
             <div 
-              className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl max-w-lg w-full p-6 shadow-2xl relative"
+              className="bg-[var(--bg-secondary)] border border-[var(--border)] max-w-lg w-full p-6 shadow-2xl relative"
               style={{
                 backgroundColor: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
-                borderRadius: '12px',
+                borderRadius: '0px',
                 maxWidth: '512px',
                 width: '100%',
                 padding: '24px',
@@ -822,7 +948,7 @@ export default function OTPPage() {
                   <line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
                   <line x1="12" y1="8" x2="12.01" y2="8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
                 </svg>
-                Hướng dẫn Giải mã 2FA
+                {t('guideTitle')}
               </h3>
 
               <div 
@@ -837,33 +963,33 @@ export default function OTPPage() {
                 }}
               >
                 <p>
-                  Chức năng <strong>Giải mã 2FA (Authenticator)</strong> trên trang <strong>/otp</strong> được xây dựng theo tiêu chuẩn quốc tế <strong>TOTP (RFC 6238)</strong> — đây chính là chuẩn chung mà Google Authenticator và Microsoft Authenticator đang sử dụng.
+                  {t('guideIntro')}
                 </p>
                 <p>
-                  Vì vậy, chức năng này hoàn toàn sử dụng được cho <strong>Spotify, Grok (X), Facebook, GitHub, Google, Discord, Microsoft...</strong> và hầu hết mọi dịch vụ trực tuyến hiện nay, chứ không chỉ giới hạn ở ChatGPT.
+                  {t('guideDetail')}
                 </p>
                 
                 <div 
-                  className="bg-[var(--bg-primary)] p-4 rounded-lg border border-[var(--border)]"
+                  className="bg-[var(--bg-primary)] p-4 border border-[var(--border)]"
                   style={{
                     backgroundColor: 'var(--bg-primary)',
                     padding: '16px',
-                    borderRadius: '8px',
+                    borderRadius: '0px',
                     border: '1px solid var(--border)',
                   }}
                 >
                   <h4 className="font-semibold text-[var(--text-primary)] mb-2" style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                    Cách sử dụng cho các dịch vụ khác:
+                    {t('guideStepsTitle')}
                   </h4>
                   <ol className="list-decimal list-inside space-y-2 pl-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <li>
-                      Khi bạn bật bảo mật 2 lớp (2FA) trên các trang web như Spotify, Grok,... họ sẽ hiển thị một mã QR kèm theo một dòng mã chữ và số viết hoa gọi là <strong>Secret Key</strong> (Khóa bí mật hoặc Mã thiết lập thủ công).
+                      {t('guideStep1')}
                     </li>
                     <li>
-                      Bạn chỉ cần sao chép đoạn <strong>Secret Key</strong> đó và dán vào ô <strong>Giải mã 2FA (Authenticator)</strong> trên tmailCC.
+                      {t('guideStep2')}
                     </li>
                     <li>
-                      Hệ thống sẽ ngay lập tức sinh ra mã 6 chữ số tự động xoay vòng sau mỗi 30 giây, trùng khớp hoàn toàn với mã hiển thị trên ứng dụng Google Authenticator ở điện thoại của bạn.
+                      {t('guideStep3')}
                     </li>
                   </ol>
                 </div>
@@ -877,14 +1003,14 @@ export default function OTPPage() {
                     padding: '8px 20px',
                     fontSize: '14px',
                     fontWeight: 'semibold',
-                    borderRadius: '6px',
+                    borderRadius: '0px',
                     backgroundColor: 'var(--accent)',
                     color: 'var(--bg-primary)',
                     border: 'none',
                     cursor: 'pointer',
                   }}
                 >
-                  Đã hiểu
+                  {t('guideUnderstand')}
                 </button>
               </div>
             </div>
@@ -895,14 +1021,14 @@ export default function OTPPage() {
       <style jsx>{`
         .otp-container {
           transition: max-width 0.3s ease;
-          max-width: 1100px;
+          max-width: 640px;
         }
         .otp-container.verified-wide {
-          max-width: 1100px;
+          max-width: 640px;
         }
         .otp-columns {
           display: grid;
-          grid-template-columns: 1.1fr 0.9fr;
+          grid-template-columns: 1fr;
           gap: 16px;
           align-items: start;
           width: 100%;
@@ -918,9 +1044,9 @@ export default function OTPPage() {
 
         @media (min-width: 769px) {
           .otp-container.verified-wide {
-            height: 90vh;
-            max-height: 800px;
-            min-height: 600px;
+            height: auto;
+            max-height: none;
+            min-height: auto;
             display: flex;
             flex-direction: column;
             padding: 30px;
@@ -929,31 +1055,26 @@ export default function OTPPage() {
             display: flex;
             flex-direction: column;
             flex: 1;
-            overflow: hidden;
-            height: 100%;
           }
           .otp-columns {
-            flex: 1;
-            overflow: hidden;
-            height: 100%;
-            align-items: stretch;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
           }
           .otp-column-left {
-            height: 100%;
-            overflow: hidden;
+            height: auto;
+            overflow: visible;
           }
           .otp-column-right {
-            height: 100%;
+            height: auto;
           }
           .email-section {
             display: flex;
             flex-direction: column;
-            flex: 1;
-            overflow: hidden;
           }
           .email-list-otp {
+            max-height: 280px;
             overflow-y: auto;
-            flex: 1;
             padding-right: 6px;
           }
           .email-list-otp::-webkit-scrollbar {
@@ -1008,10 +1129,10 @@ export default function OTPPage() {
           padding: 10px 40px 10px 12px;
           background: var(--bg-primary);
           border: 1px solid var(--border);
-          border-radius: 8px;
+          border-radius: 0px;
           color: var(--text-primary);
           font-size: 13px;
-          font-family: 'JetBrains Mono', monospace;
+          font-family: var(--font-mono), monospace;
           outline: none;
           transition: border-color 0.2s;
         }
@@ -1080,19 +1201,13 @@ export default function OTPPage() {
           font-family: var(--font-body), sans-serif;
           position: relative;
         }
-        .otp-container { width: 100%; max-width: 1100px; z-index: 10; transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .otp-container { width: 100%; max-width: 640px; z-index: 10; transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .otp-columns-login {
           display: grid;
-          grid-template-columns: 1.05fr 0.95fr;
+          grid-template-columns: 1fr;
           gap: 20px;
           width: 100%;
           align-items: start;
-        }
-        @media (max-width: 680px) {
-          .otp-columns-login {
-            grid-template-columns: 1fr;
-            gap: 16px;
-          }
         }
         .form-grid {
           display: grid;
@@ -1110,13 +1225,13 @@ export default function OTPPage() {
         .otp-logo {
           display: flex; align-items: center; justify-content: center;
           gap: 10px; font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 6px;
-          font-family: var(--font-display), 'Cinzel', serif;
+          font-family: var(--font-display), Georgia, serif;
         }
         .otp-subtitle { font-size: 13px; color: var(--text-muted); }
 
         /* Form */
         .otp-form {
-          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px;
+          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0px;
           padding: 24px; display: flex; flex-direction: column; gap: 16px;
           box-shadow: none;
           backdrop-filter: blur(12px);
@@ -1128,19 +1243,19 @@ export default function OTPPage() {
         }
         .input-group input {
           width: 100%; padding: 12px 14px; background: var(--bg-primary); border: 1px solid var(--border);
-          border-radius: 10px; color: var(--text-primary); font-size: 15px;
-          font-family: 'JetBrains Mono', 'Fira Code', monospace; outline: none; transition: border-color 0.2s;
+          border-radius: 0px; color: var(--text-primary); font-size: 15px;
+          font-family: var(--font-mono), monospace; outline: none; transition: border-color 0.2s;
         }
         .input-group input:focus { border-color: var(--accent); }
         .input-group input::placeholder { color: var(--text-muted); opacity: 0.5; }
         .input-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
         .form-error-otp {
           font-size: 13px; color: var(--error); background: rgba(212, 85, 76, 0.1);
-          padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(212, 85, 76, 0.2);
+          padding: 8px 12px; border-radius: 0px; border: 1px solid rgba(212, 85, 76, 0.2);
         }
         .submit-btn {
           display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px;
-          background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border: none; border-radius: 10px;
+          background: var(--accent); border: 1px solid var(--border); border-radius: 0px;
           color: var(--bg-primary); font-size: 14px; font-weight: 700; font-family: inherit;
           cursor: pointer; transition: opacity 0.2s, transform 0.15s;
         }
@@ -1156,11 +1271,11 @@ export default function OTPPage() {
         .verified-section { display: flex; flex-direction: column; gap: 14px; }
         .account-bar {
           display: flex; align-items: center; justify-content: space-between;
-          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0px; padding: 10px 14px;
         }
         .account-info { display: flex; align-items: center; gap: 8px; }
         .account-addr {
-          font-size: 13px; font-family: 'JetBrains Mono', monospace;
+          font-size: 13px; font-family: var(--font-mono), monospace;
           color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis;
         }
         .copy-addr-btn {
@@ -1172,7 +1287,7 @@ export default function OTPPage() {
           color: var(--text-muted);
           cursor: pointer;
           padding: 4px;
-          border-radius: 6px;
+          border-radius: 0px;
           transition: all 0.2s ease;
           width: 22px;
           height: 22px;
@@ -1196,7 +1311,7 @@ export default function OTPPage() {
         }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
         .logout-btn {
-          width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border);
+          width: 32px; height: 32px; border-radius: 0px; border: 1px solid var(--border);
           background: transparent; color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center; transition: all 0.15s;
         }
@@ -1204,7 +1319,7 @@ export default function OTPPage() {
 
         /* Code Card */
         .code-card {
-          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px; padding: 18px;
+          background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0px; padding: 18px;
           box-shadow: none;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
@@ -1220,7 +1335,7 @@ export default function OTPPage() {
         }
         .code-display { display: flex; align-items: center; gap: 12px; }
         .code-value {
-          font-family: 'JetBrains Mono', 'Fira Code', monospace;
+          font-family: var(--font-mono), monospace;
           font-size: 36px; font-weight: 700; letter-spacing: 8px; color: var(--accent); flex: 1;
         }
         .code-empty {
@@ -1228,7 +1343,7 @@ export default function OTPPage() {
           font-size: 13px; color: var(--text-muted); font-style: italic;
         }
         .copy-btn {
-          width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
+          width: 40px; height: 40px; border-radius: 0px; border: 1px solid var(--border);
           background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           transition: all 0.2s; flex-shrink: 0;
@@ -1245,12 +1360,12 @@ export default function OTPPage() {
         }
         .email-list-otp { display: flex; flex-direction: column; gap: 6px; }
         .email-row {
-          width: 100%; text-align: left; background: var(--bg-secondary); border: 1px solid var(--border);
-          border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: all 0.15s;
+          width: 100%; text-align: left; background: var(--bg-primary); border: 1px solid var(--border);
+          border-radius: 0px; padding: 12px 14px; cursor: pointer; transition: all 0.15s;
           display: flex; flex-direction: column; gap: 4px; color: inherit; font-family: inherit;
         }
         .email-row:hover { border-color: var(--border-light); background: var(--bg-hover); }
-        .email-row.active { border-color: var(--accent); background: var(--accent-subtle); }
+        .email-row.active { border-color: var(--border); background: var(--bg-tertiary); }
         .email-row-top { display: flex; justify-content: space-between; align-items: center; }
         .email-from {
           font-size: 13px; font-weight: 600; color: var(--text-primary);
@@ -1263,12 +1378,12 @@ export default function OTPPage() {
         .email-code-badge {
           display: inline-flex; align-items: center; gap: 5px;
           background: var(--accent-subtle); color: var(--accent);
-          font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
-          padding: 4px 10px; border-radius: 6px; cursor: pointer;
+          font-size: 13px; font-weight: 700; font-family: var(--font-mono), monospace;
+          padding: 4px 10px; border-radius: 0px; cursor: pointer;
           width: fit-content; margin-top: 2px; transition: background 0.15s;
-          border: 1px solid rgba(217, 167, 82, 0.2);
+          border: 1px solid var(--border);
         }
-        .email-code-badge:hover { background: rgba(217, 167, 82, 0.2); }
+        .email-code-badge:hover { background: var(--border-light); }
         .email-preview-expanded {
           font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 6px;
           padding-top: 8px; border-top: 1px solid var(--border); white-space: pre-wrap; word-break: break-word;

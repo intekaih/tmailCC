@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyToken, getProfile } from '@/lib/auth';
 import { API_KEY_SCOPES, WEBHOOK_EVENTS } from '@/lib/constants';
+import { apiOk, apiErr, apiUnauthorized, apiForbidden } from '@/lib/types';
+import { encrypt, decrypt, isEncrypted } from '@/lib/encryption';
 
 export type Scope = typeof API_KEY_SCOPES[number];
 
@@ -60,7 +62,14 @@ async function requireAuth(request: NextRequest) {
     return { error: 'Account is disabled', status: 403 };
   }
 
-  return { user: { ...decoded, ...profile } };
+  return {
+    user: {
+      id: decoded.sub,
+      username: profile.username as string,
+      role: profile.role as 'user' | 'admin',
+      is_active: profile.is_active as unknown as boolean,
+    }
+  };
 }
 
 function hashApiKey(key: string): string {
@@ -91,7 +100,7 @@ function generateWebhookSecret(): { raw: string; hint: string } {
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return apiUnauthorized(auth.error);
   }
 
   const user = auth.user!;
@@ -105,24 +114,35 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('[Developer] Failed to fetch API keys:', error);
-      return NextResponse.json({ error: 'Failed to fetch API keys' }, { status: 500 });
+      return apiErr('DB_ERROR', 'Failed to fetch API keys', 500);
     }
 
-    const formattedKeys = (keys || []).map((key: ApiKey) => ({
-      id: key.id,
-      name: key.name,
-      prefix: key.key_hint,
-      scopes: key.scopes,
-      expiresAt: key.expires_at,
-      lastUsedAt: key.last_used_at,
-      isActive: key.is_active,
-      createdAt: key.created_at,
-    }));
+    const formattedKeys = (keys || []).map((key: ApiKey) => {
+      let rawKey = '';
+      if (key.prefix && isEncrypted(key.prefix)) {
+        try {
+          rawKey = decrypt(key.prefix);
+        } catch (e) {
+          console.error('[Developer] Failed to decrypt API key prefix:', e);
+        }
+      }
+      return {
+        id: key.id,
+        name: key.name,
+        prefix: key.key_hint,
+        key: rawKey || null,
+        scopes: key.scopes,
+        expiresAt: key.expires_at,
+        lastUsedAt: key.last_used_at,
+        isActive: key.is_active,
+        createdAt: key.created_at,
+      };
+    });
 
-    return NextResponse.json({ keys: formattedKeys });
+    return apiOk({ keys: formattedKeys });
   } catch (err) {
     console.error('[Developer] GET /keys error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return apiErr('INTERNAL_ERROR', 'Internal server error', 500);
   }
 }
 
@@ -132,7 +152,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return apiUnauthorized(auth.error);
   }
 
   const user = auth.user!;
@@ -142,17 +162,17 @@ export async function POST(request: NextRequest) {
     const { name, scopes = [], expiresAt } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+      return apiErr('VALIDATION_ERROR', 'Name is required', 400);
     }
 
     if (name.length > 100) {
-      return NextResponse.json({ error: 'Name must be less than 100 characters' }, { status: 400 });
+      return apiErr('VALIDATION_ERROR', 'Name must be less than 100 characters', 400);
     }
 
     // Validate scopes
     const validScopes = scopes.filter((s: string) => API_KEY_SCOPES.includes(s as Scope));
     if (validScopes.length === 0) {
-      return NextResponse.json({ error: 'At least one scope is required' }, { status: 400 });
+      return apiErr('VALIDATION_ERROR', 'At least one scope is required', 400);
     }
 
     // Check for accounts:create scope and ensure accounts:read is included
@@ -162,13 +182,14 @@ export async function POST(request: NextRequest) {
 
     const { raw, prefix, hash, hint } = generateApiKey();
     const expiresAtValue = expiresAt ? new Date(expiresAt).toISOString() : null;
+    const encryptedKey = encrypt(raw);
 
     const { data: apiKey, error } = await supabaseAdmin!
       .from('api_keys')
       .insert({
         user_id: user.id,
         name: name.trim(),
-        prefix,
+        prefix: encryptedKey,
         key_hash: hash,
         key_hint: hint,
         scopes: validScopes,
@@ -180,11 +201,11 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Developer] Failed to create API key:', error);
-      return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
+      return apiErr('DB_ERROR', 'Failed to create API key', 500);
     }
 
     // Return the raw key ONLY this time
-    return NextResponse.json({
+    return apiOk({
       id: apiKey.id,
       name: apiKey.name,
       key: raw, // Only returned once!
@@ -192,9 +213,9 @@ export async function POST(request: NextRequest) {
       scopes: apiKey.scopes,
       expiresAt: apiKey.expires_at,
       createdAt: apiKey.created_at,
-    }, { status: 201 });
+    }, { status: 201 } as ResponseInit);
   } catch (err) {
     console.error('[Developer] POST /keys error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return apiErr('INTERNAL_ERROR', 'Internal server error', 500);
   }
 }

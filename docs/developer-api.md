@@ -2,7 +2,7 @@
 
 > **tmailCC Developer API v1**
 > Last updated: May 23, 2026
-> Base URL: `https://tmailcc.kaih.co.uk/api/v1`
+> Base URL: `https://tmailcc.app/api/v1`
 
 ---
 
@@ -32,7 +32,7 @@ The tmailCC Developer API allows third-party applications, scripts, and external
 ### Base URL
 
 ```
-Production: https://tmailcc.kaih.co.uk/api/v1
+Production: https://tmailcc.app/api/v1
 ```
 
 ### Request Format
@@ -93,7 +93,7 @@ Include the API key in every request:
 
 ```bash
 curl -H "Authorization: Bearer tmail_abc123..." \
-     https://tmailcc.kaih.co.uk/api/v1/domains
+     https://tmailcc.app/api/v1/domains
 ```
 
 ---
@@ -137,7 +137,7 @@ List all available domains for creating email accounts.
     "domains": [
       {
         "id": "uuid",
-        "domain": "kaih.co.uk",
+        "domain": "tmailcc.app",
         "label": "Primary",
         "isDefault": true
       }
@@ -150,7 +150,7 @@ List all available domains for creating email accounts.
 
 ```bash
 curl -H "Authorization: Bearer <key>" \
-     https://tmailcc.kaih.co.uk/api/v1/domains
+     https://tmailcc.app/api/v1/domains
 ```
 
 ---
@@ -168,7 +168,7 @@ Create a new temporary email account.
 ```json
 {
   "localPart": "myuser",     // Optional: custom username
-  "domain": "kaih.co.uk"     // Optional: specific domain
+  "domain": "tmailcc.app"     // Optional: specific domain
 }
 ```
 
@@ -180,9 +180,9 @@ If `localPart` is not provided, a random 12-character address is generated.
 {
   "success": true,
   "data": {
-    "address": "myuser@kaih.co.uk",
+    "address": "myuser@tmailcc.app",
     "localPart": "myuser",
-    "domain": "kaih.co.uk",
+    "domain": "tmailcc.app",
     "createdAt": "2026-05-23T10:00:00.000Z"
   }
 }
@@ -195,13 +195,13 @@ If `localPart` is not provided, a random 12-character address is generated.
 curl -X POST -H "Authorization: Bearer <key>" \
      -H "Content-Type: application/json" \
      -d '{}' \
-     https://tmailcc.kaih.co.uk/api/v1/accounts
+     https://tmailcc.app/api/v1/accounts
 
 # Custom address
 curl -X POST -H "Authorization: Bearer <key>" \
      -H "Content-Type: application/json" \
-     -d '{"localPart": "test123", "domain": "kaih.co.uk"}' \
-     https://tmailcc.kaih.co.uk/api/v1/accounts
+     -d '{"localPart": "test123", "domain": "tmailcc.app"}' \
+     https://tmailcc.app/api/v1/accounts
 ```
 
 ---
@@ -229,9 +229,9 @@ List all email accounts belonging to the authenticated user.
   "data": {
     "accounts": [
       {
-        "address": "abc123@kaih.co.uk",
+        "address": "abc123@tmailcc.app",
         "localPart": "abc123",
-        "domain": "kaih.co.uk",
+        "domain": "tmailcc.app",
         "emailCount": 5,
         "createdAt": "2026-05-23T10:00:00.000Z",
         "lastActivity": "2026-05-23T12:00:00.000Z"
@@ -263,7 +263,7 @@ Delete an email account and all its emails.
   "success": true,
   "data": {
     "message": "Account deleted",
-    "address": "abc123@kaih.co.uk"
+    "address": "abc123@tmailcc.app"
   }
 }
 ```
@@ -272,7 +272,7 @@ Delete an email account and all its emails.
 
 ```bash
 curl -X DELETE -H "Authorization: Bearer <key>" \
-     https://tmailcc.kaih.co.uk/api/v1/accounts/abc123%40kaih.co.uk
+     https://tmailcc.app/api/v1/accounts/abc123%40tmailcc.app
 ```
 
 ---
@@ -306,7 +306,7 @@ List emails in an account's inbox.
           "address": "sender@example.com",
           "name": "Sender"
         },
-        "to": "abc123@kaih.co.uk",
+        "to": "abc123@tmailcc.app",
         "subject": "Your verification code",
         "isRead": false,
         "isStarred": false,
@@ -346,7 +346,7 @@ Get full email details including content.
       "address": "sender@example.com",
       "name": "Sender"
     },
-    "to": "abc123@kaih.co.uk",
+    "to": "abc123@tmailcc.app",
     "subject": "Your verification code",
     "text": "Your code is 123456",
     "html": "<html>...</html>",
@@ -431,7 +431,7 @@ async function waitForOTP(address, timeout = 120) {
 
   while (Date.now() - startTime < maxTime) {
     const response = await fetch(
-      `https://tmailcc.kaih.co.uk/api/v1/accounts/${address}/wait-otp?timeout=10`,
+      `https://tmailcc.app/api/v1/accounts/${address}/wait-otp?timeout=10`,
       {
         headers: {
           'Authorization': `Bearer ${API_KEY}`
@@ -453,7 +453,7 @@ async function waitForOTP(address, timeout = 120) {
 }
 
 // Usage
-const code = await waitForOTP('test@kaih.co.uk');
+const code = await waitForOTP('test@tmailcc.app');
 console.log('OTP:', code);
 ```
 
@@ -571,7 +571,7 @@ Delete a webhook.
       "address": "sender@example.com",
       "name": "Sender"
     },
-    "to": "abc123@kaih.co.uk",
+    "to": "abc123@tmailcc.app",
     "subject": "Test Email",
     "text": "Email body...",
     "receivedAt": "2026-05-23T12:00:00.000Z"
@@ -675,7 +675,7 @@ Failed webhook deliveries are retried up to 3 times with exponential backoff:
 
 ```javascript
 const API_KEY = 'tmail_abc123...';
-const BASE_URL = 'https://tmailcc.kaih.co.uk/api/v1';
+const BASE_URL = 'https://tmailcc.app/api/v1';
 
 // Create email account
 async function createAccount() {
@@ -722,7 +722,7 @@ console.log('Emails:', emails);
 import requests
 
 API_KEY = 'tmail_abc123...'
-BASE_URL = 'https://tmailcc.kaih.co.uk/api/v1'
+BASE_URL = 'https://tmailcc.app/api/v1'
 headers = {'Authorization': f'Bearer {API_KEY}'}
 
 # Create account
@@ -752,7 +752,7 @@ async function waitForOTP(address, timeout = 120) {
   while (Date.now() - startTime < maxTime) {
     try {
       const response = await fetch(
-        `https://tmailcc.kaih.co.uk/api/v1/accounts/${address}/wait-otp?timeout=10`,
+        `https://tmailcc.app/api/v1/accounts/${address}/wait-otp?timeout=10`,
         {
           headers: {
             'Authorization': `Bearer ${API_KEY}`,
@@ -916,7 +916,7 @@ Rate limit headers are included in every response:
 
 For issues or questions:
 - GitHub Issues: [tmailCC Issues](https://github.com/your-repo/issues)
-- Email: support@kaih.co.uk
+- Email: support@tmailcc.app
 
 ---
 

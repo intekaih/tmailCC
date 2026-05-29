@@ -3,4 +3,4 @@ main = "tmail-worker.ts"
 compatibility_date = "2024-01-01"
 
 [vars]
-  WEBHOOK_URL = "https://tmailcc-api.kaih.co.uk"
+  WEBHOOK_URL = "https://tmailcc.app"

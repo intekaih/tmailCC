@@ -327,8 +327,8 @@ export default function DotmailView({ account }: DotmailViewProps) {
                     onClick={() => setSelectedEmail(email)}
                     className={`p-3 rounded-xl border cursor-pointer transition-all duration-150 flex flex-col gap-1 relative
                       ${isSelected 
-                        ? 'bg-[var(--accent-subtle)]/25 border-[var(--accent)]/40' 
-                        : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border-[var(--border)]'
+                        ? 'bg-[var(--bg-tertiary)] border-[var(--border)]' 
+                        : 'bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] border-[var(--border)]'
                       }`}
                   >
                     <div className="flex justify-between items-baseline gap-2">

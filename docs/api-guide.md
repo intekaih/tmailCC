@@ -1,6 +1,6 @@
 # Hướng Dẫn Sử Dụng tmailCC API
 
-> **Base URL:** `https://tmailcc.kaih.co.uk/api/v1`
+> **Base URL:** `https://tmailcc.app/api/v1`
 
 ---
 
@@ -35,10 +35,10 @@
 ### Tạo Email Mới
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/v1/accounts \
+curl -X POST https://tmailcc.app/api/v1/accounts \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"domain": "kaih.co.uk"}'
+  -d '{"domain": "tmailcc.app"}'
 ```
 
 **Response:**
@@ -46,9 +46,9 @@ curl -X POST https://tmailcc.kaih.co.uk/api/v1/accounts \
 {
   "success": true,
   "data": {
-    "address": "abc123@kaih.co.uk",
+    "address": "abc123@tmailcc.app",
     "localPart": "abc123",
-    "domain": "kaih.co.uk",
+    "domain": "tmailcc.app",
     "createdAt": "2026-05-23T12:00:00Z"
   }
 }
@@ -59,7 +59,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/v1/accounts \
 ### Xem Inbox
 
 ```bash
-curl https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk/emails \
+curl https://tmailcc.app/api/v1/accounts/abc123@tmailcc.app/emails \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -68,7 +68,7 @@ curl https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk/emails \
 ### Đọc Chi Tiết Email
 
 ```bash
-curl https://tmailcc.kaih.co.uk/api/v1/emails/EMAIL_ID \
+curl https://tmailcc.app/api/v1/emails/EMAIL_ID \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -77,7 +77,7 @@ curl https://tmailcc.kaih.co.uk/api/v1/emails/EMAIL_ID \
 ### Chờ Nhận Mã OTP
 
 ```bash
-curl "https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk/wait-otp?timeout=120" \
+curl "https://tmailcc.app/api/v1/accounts/abc123@tmailcc.app/wait-otp?timeout=120" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -101,7 +101,7 @@ curl "https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk/wait-otp?time
 ### Xóa Email Account
 
 ```bash
-curl -X DELETE "https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk" \
+curl -X DELETE "https://tmailcc.app/api/v1/accounts/abc123@tmailcc.app" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -110,7 +110,7 @@ curl -X DELETE "https://tmailcc.kaih.co.uk/api/v1/accounts/abc123@kaih.co.uk" \
 ### Xem Domains
 
 ```bash
-curl https://tmailcc.kaih.co.uk/api/v1/domains \
+curl https://tmailcc.app/api/v1/domains \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -122,7 +122,7 @@ curl https://tmailcc.kaih.co.uk/api/v1/domains \
 
 ```javascript
 const API_KEY = 'YOUR_API_KEY';
-const BASE = 'https://tmailcc.kaih.co.uk/api/v1';
+const BASE = 'https://tmailcc.app/api/v1';
 
 async function createEmail() {
   const res = await fetch(`${BASE}/accounts`, {
@@ -131,7 +131,7 @@ async function createEmail() {
       'Authorization': `Bearer ${API_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ domain: 'kaih.co.uk' })
+    body: JSON.stringify({ domain: 'tmailcc.app' })
   });
   return (await res.json()).data.address;
 }
@@ -178,7 +178,7 @@ async function waitForOTP(address, timeoutSec = 120) {
 }
 
 // Sử dụng
-const code = await waitForOTP('test@kaih.co.uk');
+const code = await waitForOTP('test@tmailcc.app');
 console.log('Mã OTP:', code);
 ```
 
@@ -257,7 +257,7 @@ app.listen(3000);
 ## 7. Tạo Webhook
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/v1/webhooks \
+curl -X POST https://tmailcc.app/api/v1/webhooks \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -276,7 +276,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/v1/webhooks \
   "data": {
     "id": "email-uuid",
     "from": {"address": "sender@example.com", "name": "Sender"},
-    "to": "abc123@kaih.co.uk",
+    "to": "abc123@tmailcc.app",
     "subject": "Test",
     "text": "Body...",
     "receivedAt": "2026-05-23T12:00:00Z"
@@ -296,7 +296,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/v1/webhooks \
 ### Xem tất cả Gmail gốc & Dotmail
 
 ```bash
-curl https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 
@@ -323,7 +323,7 @@ curl https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Thêm Gmail gốc
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "add-parent", "address": "00yt0001@gmail.com", "app_password": "abcdefghijklmnop"}'
@@ -334,7 +334,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Sinh Dotmail (chỉ 1 dấu chấm)
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "generate", "parent_id": "PARENT_UUID"}'
@@ -345,7 +345,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Lấy OTP từ Gmail (qua IMAP)
 
 ```bash
-curl "https://tmailcc.kaih.co.uk/api/admin/dotmails?action=otp&address=0.0yt0001@gmail.com" \
+curl "https://tmailcc.app/api/admin/dotmails?action=otp&address=0.0yt0001@gmail.com" \
   -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 
@@ -363,7 +363,7 @@ curl "https://tmailcc.kaih.co.uk/api/admin/dotmails?action=otp&address=0.0yt0001
 ### Xóa Gmail gốc
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "delete-parent", "id": "PARENT_UUID"}'
@@ -374,7 +374,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Xóa một Dotmail
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "delete-dotmail", "id": "DOTMAIL_UUID"}'
@@ -385,7 +385,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Cập nhật App Password Gmail gốc
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "update-parent", "id": "PARENT_UUID", "app_password": "new_app_password"}'
@@ -396,7 +396,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Kiểm tra kết nối Gmail gốc (IMAP)
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
+curl -X POST https://tmailcc.app/api/admin/dotmails \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "check-parent", "id": "PARENT_UUID"}'
@@ -419,7 +419,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/dotmails \
 ### Xem danh sách Domain (Admin)
 
 ```bash
-curl https://tmailcc.kaih.co.uk/api/admin/domains \
+curl https://tmailcc.app/api/admin/domains \
   -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 
@@ -429,7 +429,7 @@ curl https://tmailcc.kaih.co.uk/api/admin/domains \
   "domains": [
     {
       "id": "uuid",
-      "domain": "kaih.co.uk",
+      "domain": "tmailcc.app",
       "label": "Primary",
       "isActive": true,
       "isDefault": true,
@@ -445,7 +445,7 @@ curl https://tmailcc.kaih.co.uk/api/admin/domains \
 ### Thêm Domain mới (Admin)
 
 ```bash
-curl -X POST https://tmailcc.kaih.co.uk/api/admin/domains \
+curl -X POST https://tmailcc.app/api/admin/domains \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -461,7 +461,7 @@ curl -X POST https://tmailcc.kaih.co.uk/api/admin/domains \
 ### Xóa Domain (Admin)
 
 ```bash
-curl -X DELETE https://tmailcc.kaih.co.uk/api/admin/domain/DOMAIN_UUID \
+curl -X DELETE https://tmailcc.app/api/admin/domain/DOMAIN_UUID \
   -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 

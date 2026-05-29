@@ -2,7 +2,7 @@
 
 Hệ thống Webmail hiện đại với email tạm thời, real-time notifications, và quản lý đa miền.
 
-**Production URL:** https://tmailcc.kaih.co.uk/
+**Production URL:** https://tmailcc.app/
 
 ## Công nghệ
 

@@ -131,43 +131,43 @@ function QuickAccessContent() {
         .quick-access-page {
           height: 100vh;
           overflow-y: auto;
-          background: #0a0a0f;
+          background: var(--bg-primary);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 24px;
-          font-family: 'Inter', sans-serif;
-          color: #e4e4e7;
+          font-family: var(--font-body), sans-serif;
+          color: var(--text-primary);
         }
         .card {
           width: 100%;
           max-width: 400px;
           padding: 32px 24px;
-          border-radius: 16px;
-          background: rgba(19, 19, 26, 0.65);
-          border: 1px solid rgba(39, 39, 42, 0.5);
-          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+          border-radius: 0px;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border);
+          box-shadow: var(--shadow);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
         }
         .title {
           font-size: 20px;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-primary);
           margin-bottom: 8px;
         }
         .text-red {
-          color: #ef4444;
+          color: var(--error);
         }
         .subtitle {
           font-size: 14px;
-          color: #a78bfa;
-          font-family: 'JetBrains Mono', monospace;
+          color: var(--accent);
+          font-family: var(--font-mono), monospace;
           word-break: break-all;
         }
         .error-description {
           font-size: 13.5px;
-          color: #a1a1aa;
+          color: var(--text-secondary);
           line-height: 1.5;
         }
         .spinner-glow {
@@ -182,8 +182,8 @@ function QuickAccessContent() {
           width: 100%;
           height: 100%;
           border: 3px solid transparent;
-          border-top-color: #a78bfa;
-          border-bottom-color: #7c3aed;
+          border-top-color: var(--accent);
+          border-bottom-color: var(--text-muted);
           border-radius: 50%;
           animation: spin 1.2s linear infinite;
         }
@@ -193,14 +193,14 @@ function QuickAccessContent() {
           width: 48px;
           height: 48px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(167, 139, 250, 0.15) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(0, 0, 0, 0.05) 0%, transparent 70%);
           filter: blur(4px);
         }
         .icon-error-wrap {
           width: 80px;
           height: 80px;
           border-radius: 50%;
-          background: rgba(239, 68, 68, 0.1);
+          background: rgba(0, 0, 0, 0.05);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -212,34 +212,34 @@ function QuickAccessContent() {
           padding: 12px;
           font-size: 14px;
           font-weight: 600;
-          border-radius: 10px;
+          border-radius: 0px;
           border: none;
           cursor: pointer;
           transition: all 0.2s;
           flex: 1;
         }
         .action-btn.primary {
-          background: linear-gradient(135deg, #7c3aed, #a78bfa);
-          color: #fff;
+          background: var(--accent);
+          color: var(--bg-primary);
         }
         .action-btn.primary:hover {
           opacity: 0.95;
           transform: translateY(-1px);
         }
         .action-btn.secondary {
-          background: #1e1e2a;
-          color: #e4e4e7;
-          border: 1px solid #27272a;
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
+          border: 1px solid var(--border);
         }
         .action-btn.secondary:hover {
-          background: #27272a;
-          border-color: #3f3f46;
+          background: var(--bg-hover);
+          border-color: var(--border);
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
         .outfit {
-          font-family: 'Outfit', sans-serif;
+          font-family: var(--font-display), sans-serif;
         }
         .fade-in {
           animation: fadeIn 0.4s ease-out;
@@ -258,12 +258,12 @@ export default function QuickAccessPage() {
     <Suspense fallback={
       <div style={{
         height: '100vh',
-        background: '#0a0a0f',
+        background: 'var(--bg-primary)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#e4e4e7',
-        fontFamily: 'sans-serif'
+        color: 'var(--text-primary)',
+        fontFamily: 'var(--font-body), sans-serif'
       }}>
         Đang tải...
       </div>
