@@ -531,7 +531,8 @@ function startOtpPolling() {
 
   state.isOtpPolling = true;
   state.otpStartTime = Date.now();
-  $('otpStartOtp').classList.add('hidden');
+  state.otpStartTimeSec = true;
+  $('btnStartOtp').classList.add('hidden');
   $('btnStopOtp').classList.remove('hidden');
   $('otpStatus').innerHTML = '<div class="otp-pulse"></div><span>Dang cho ma OTP...</span>';
   $('otpCodes').innerHTML = '<div class="otp-empty">Ma OTP se hien thi o day khi co email xac minh</div>';
